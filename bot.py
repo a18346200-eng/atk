@@ -1,6 +1,7 @@
 import os
 import logging
 import httpx
+import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
@@ -18,22 +19,35 @@ if not TOKEN:
     TOKEN = "8860863617:AAFizT8wFBJFt4uq7U9NpGfK_jwahrA35_o"
 
 # شناسه عددی سازنده ربات (فقط این کاربر می‌تونه از ربات استفاده کنه)
-OWNER_ID = 7803165903  # ✅ ایدی شما تنظیم شد
+OWNER_ID = 7803165903  # ✅ ایدی شما
 
 # 🔑 اطلاعات API خود را از my.telegram.org بگیرید
-API_ID = 37160656  # API ID خود را اینجا بگذارید
-API_HASH = "c75ef3eadae1ffb6cad9d6736d0e2323"  # API HASH خود را اینجا بگذارید
+API_ID = 37160656
+API_HASH = "c75ef3eadae1ffb6cad9d6736d0e2323"
 
 # متغیرهای ذخیره موقت برای فرآیند ساخت سشن
 user_sessions = {}
 
-# پاک کردن Webhook قبلی
-try:
-    response = httpx.get(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook")
-    if response.json().get('ok'):
-        print("✅ Webhook قبلی پاک شد")
-except Exception as e:
-    print(f"⚠️ خطا در پاک کردن Webhook: {e}")
+# پاک کردن Webhook قبلی با روش مطمئن
+print("🔄 در حال پاک کردن Webhook قبلی...")
+for attempt in range(3):
+    try:
+        response = httpx.post(
+            f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
+            json={"drop_pending_updates": True},
+            timeout=30
+        )
+        if response.json().get('ok'):
+            print("✅ Webhook قبلی با موفقیت پاک شد")
+            break
+        else:
+            print(f"⚠️ تلاش {attempt + 1}: Webhook پاک نشد")
+    except Exception as e:
+        print(f"⚠️ تلاش {attempt + 1}: خطا در پاک کردن Webhook - {e}")
+    time.sleep(2)
+
+# صبر برای اعمال تغییرات
+time.sleep(3)
 
 # متن استارت برای سازنده ربات
 OWNER_START_TEXT = """
@@ -362,6 +376,8 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     try:
+        print("🚀 ربات در حال راه‌اندازی...")
+        
         # ساخت اپلیکیشن
         application = ApplicationBuilder().token(TOKEN).build()
         
@@ -371,15 +387,19 @@ if __name__ == '__main__':
         application.add_handler(CallbackQueryHandler(button_callback))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
-        print(f"🚀 ربات در حال روشن شدن با Polling...")
-        print(f"✅ Webhook قبلی پاک شده")
+        print(f"✅ ربات با موفقیت راه‌اندازی شد!")
         print(f"👤 سازنده ربات: {OWNER_ID}")
         print(f"🔑 API_ID: {API_ID}")
+        print("🔄 در حال شروع Polling...")
         
-        # راه‌اندازی با Polling
+        # راه‌اندازی با Polling و تنظیمات جدید
         application.run_polling(
             drop_pending_updates=True,
-            allowed_updates=['message', 'callback_query']
+            allowed_updates=['message', 'callback_query'],
+            timeout=60,
+            read_timeout=30,
+            write_timeout=30,
+            pool_timeout=30
         )
         
     except Exception as e:
