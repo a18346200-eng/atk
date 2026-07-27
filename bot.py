@@ -2,8 +2,9 @@ import os
 import logging
 import httpx
 import time
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # تنظیم لاگ
 logging.basicConfig(
@@ -67,7 +68,7 @@ NORMAL_START_TEXT = """
 شما اجازه استفاده از این ربات را ندارید.
 """
 
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """هندلر /start"""
     user = update.effective_user
     user_id = user.id
@@ -80,32 +81,32 @@ def start(update: Update, context: CallbackContext):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        update.message.reply_text(
+        await update.message.reply_text(
             OWNER_START_TEXT,
             parse_mode='HTML',
             reply_markup=reply_markup
         )
     else:
-        update.message.reply_text(
+        await update.message.reply_text(
             NORMAL_START_TEXT,
             parse_mode='HTML'
         )
 
-def button_callback(update: Update, context: CallbackContext):
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مدیریت دکمه‌ها"""
     query = update.callback_query
     user_id = query.from_user.id
     
     if user_id != OWNER_ID:
-        query.answer("⛔ شما دسترسی ندارید!", show_alert=True)
+        await query.answer("⛔ شما دسترسی ندارید!", show_alert=True)
         return
     
-    query.answer()
+    await query.answer()
     
     if query.data == 'add_account':
         user_sessions[user_id] = {'step': 'phone'}
         
-        query.edit_message_text(
+        await query.edit_message_text(
             "📱 <b>افزودن اکانت جدید</b>\n\n"
             "◄ لطفاً <b>شماره تلفن</b> خود را ارسال کنید.\n"
             "◂ مثال: <code>+989123456789</code>\n\n"
@@ -119,7 +120,7 @@ def button_callback(update: Update, context: CallbackContext):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        query.edit_message_text(
+        await query.edit_message_text(
             "⚙️ <b>تنظیمات ربات</b>\n\n"
             "📍 در حال توسعه...",
             parse_mode='HTML',
@@ -132,7 +133,7 @@ def button_callback(update: Update, context: CallbackContext):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        query.edit_message_text(
+        await query.edit_message_text(
             "💥 <b>بخش حمله</b>\n\n"
             "📍 در حال توسعه...",
             parse_mode='HTML',
@@ -147,13 +148,13 @@ def button_callback(update: Update, context: CallbackContext):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        query.edit_message_text(
+        await query.edit_message_text(
             OWNER_START_TEXT,
             parse_mode='HTML',
             reply_markup=reply_markup
         )
 
-def handle_message(update: Update, context: CallbackContext):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مدیریت پیام‌ها"""
     user_id = update.effective_user.id
     
@@ -170,7 +171,7 @@ def handle_message(update: Update, context: CallbackContext):
         phone = text.strip()
         
         if not phone.startswith('+') or not phone[1:].isdigit():
-            update.message.reply_text(
+            await update.message.reply_text(
                 "❌ <b>فرمت شماره نامعتبر!</b>\n\n"
                 "◄ مثال: <code>+989123456789</code>",
                 parse_mode='HTML'
@@ -180,23 +181,22 @@ def handle_message(update: Update, context: CallbackContext):
         user_sessions[user_id]['phone'] = phone
         user_sessions[user_id]['step'] = 'code'
         
-        # ارسال کد تایید
-        send_verification_code(update, user_id, phone)
+        await send_verification_code(update, user_id, phone)
     
     elif step == 'code':
         code = text.strip()
         
         if not code.isdigit() or len(code) != 5:
-            update.message.reply_text(
+            await update.message.reply_text(
                 "❌ <b>کد نامعتبر!</b>\n\n"
                 "◄ کد ۵ رقمی را وارد کنید.",
                 parse_mode='HTML'
             )
             return
         
-        verify_code_and_create_session(update, user_id, code)
+        await verify_code_and_create_session(update, user_id, code)
 
-def send_verification_code(update: Update, user_id: int, phone: str):
+async def send_verification_code(update: Update, user_id: int, phone: str):
     """ارسال کد تایید"""
     try:
         from pyrogram import Client
@@ -208,13 +208,13 @@ def send_verification_code(update: Update, user_id: int, phone: str):
             phone_number=phone
         )
         
-        app.connect()
-        sent_code = app.send_code(phone)
+        await app.connect()
+        sent_code = await app.send_code(phone)
         
         user_sessions[user_id]['client'] = app
         user_sessions[user_id]['phone_code_hash'] = sent_code.phone_code_hash
         
-        update.message.reply_text(
+        await update.message.reply_text(
             f"📨 <b>کد تایید ارسال شد!</b>\n\n"
             f"◄ کد به شماره <code>{phone}</code> ارسال شد.\n"
             f"◂ کد ۵ رقمی را وارد کنید.",
@@ -223,7 +223,7 @@ def send_verification_code(update: Update, user_id: int, phone: str):
         
     except Exception as e:
         error_msg = str(e)
-        update.message.reply_text(
+        await update.message.reply_text(
             f"❌ <b>خطا!</b>\n\n"
             f"◄ خطا: <code>{error_msg}</code>",
             parse_mode='HTML'
@@ -231,7 +231,7 @@ def send_verification_code(update: Update, user_id: int, phone: str):
         if user_id in user_sessions:
             del user_sessions[user_id]
 
-def verify_code_and_create_session(update: Update, user_id: int, code: str):
+async def verify_code_and_create_session(update: Update, user_id: int, code: str):
     """تایید کد و ساخت سشن"""
     try:
         from pyrogram import Client
@@ -240,18 +240,18 @@ def verify_code_and_create_session(update: Update, user_id: int, code: str):
         phone_code_hash = user_sessions[user_id]['phone_code_hash']
         app = user_sessions[user_id]['client']
         
-        app.sign_in(
+        await app.sign_in(
             phone_number=phone,
             phone_code_hash=phone_code_hash,
             phone_code=code
         )
         
-        session_string = app.export_session_string()
+        session_string = await app.export_session_string()
         
         with open(f"session_{phone}.txt", "w") as f:
             f.write(session_string)
         
-        update.message.reply_text(
+        await update.message.reply_text(
             f"✅ <b>سشن ساخته شد!</b>\n\n"
             f"📱 <b>شماره:</b> <code>{phone}</code>\n\n"
             f"🔑 <b>سشن:</b>\n"
@@ -260,13 +260,13 @@ def verify_code_and_create_session(update: Update, user_id: int, code: str):
             parse_mode='HTML'
         )
         
-        app.disconnect()
+        await app.disconnect()
         
         if user_id in user_sessions:
             del user_sessions[user_id]
         
     except Exception as e:
-        update.message.reply_text(
+        await update.message.reply_text(
             f"❌ <b>خطا در ساخت سشن!</b>\n\n"
             f"◄ خطا: <code>{str(e)}</code>",
             parse_mode='HTML'
@@ -275,30 +275,30 @@ def verify_code_and_create_session(update: Update, user_id: int, code: str):
         if user_id in user_sessions:
             if 'client' in user_sessions[user_id]:
                 try:
-                    user_sessions[user_id]['client'].disconnect()
+                    await user_sessions[user_id]['client'].disconnect()
                 except:
                     pass
             del user_sessions[user_id]
 
-def cancel_command(update: Update, context: CallbackContext):
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """لغو عملیات"""
     user_id = update.effective_user.id
     
     if user_id in user_sessions:
         if 'client' in user_sessions[user_id]:
             try:
-                user_sessions[user_id]['client'].disconnect()
+                await user_sessions[user_id]['client'].disconnect()
             except:
                 pass
         
         del user_sessions[user_id]
         
-        update.message.reply_text(
+        await update.message.reply_text(
             "❌ <b>عملیات لغو شد!</b>",
             parse_mode='HTML'
         )
     else:
-        update.message.reply_text(
+        await update.message.reply_text(
             "ℹ️ <b>هیچ عملیاتی وجود ندارد!</b>",
             parse_mode='HTML'
         )
@@ -307,22 +307,23 @@ if __name__ == '__main__':
     try:
         print("🚀 ربات در حال راه‌اندازی...")
         
-        # استفاده از Updater به جای ApplicationBuilder
-        updater = Updater(token=TOKEN, use_context=True)
-        dp = updater.dispatcher
+        # ساخت اپلیکیشن
+        application = ApplicationBuilder().token(TOKEN).build()
         
         # اضافه کردن هندلرها
-        dp.add_handler(CommandHandler('start', start))
-        dp.add_handler(CommandHandler('cancel', cancel_command))
-        dp.add_handler(CallbackQueryHandler(button_callback))
-        dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+        application.add_handler(CommandHandler('start', start))
+        application.add_handler(CommandHandler('cancel', cancel_command))
+        application.add_handler(CallbackQueryHandler(button_callback))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         print(f"✅ ربات با موفقیت راه‌اندازی شد!")
         print(f"👤 سازنده ربات: {OWNER_ID}")
         
         # شروع Polling
-        updater.start_polling(drop_pending_updates=True)
-        updater.idle()
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=['message', 'callback_query']
+        )
         
     except Exception as e:
         print(f"❌ خطا: {e}")
