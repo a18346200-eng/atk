@@ -317,7 +317,6 @@ async def stop_all_attacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
-                from pytgcalls import PyTgCalls
                 
                 app = Client(
                     f"temp_session_{acc['id']}",
@@ -327,10 +326,6 @@ async def stop_all_attacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 await app.connect()
                 
-                # توقف پخش در ویس چت
-                call = PyTgCalls(app)
-                await call.start()
-                
                 # خروج از همه گروه‌ها
                 async for dialog in app.get_dialogs():
                     if dialog.chat.type in ["group", "supergroup"]:
@@ -339,15 +334,13 @@ async def stop_all_attacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         except:
                             pass
                 
-                await call.stop()
                 await app.disconnect()
             except:
                 pass
         
         await update.message.reply_text(
             "✅ <b>حمله با موفقیت متوقف شد!</b>\n\n"
-            "◄ تمام اکانت‌ها از گروه‌ها خارج شدند.\n"
-            "◄ پخش رسانه متوقف شد.",
+            "◄ تمام اکانت‌ها از گروه‌ها خارج شدند.",
             parse_mode='HTML'
         )
     except Exception as e:
@@ -571,7 +564,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
-                from pyrogram.types import Chat
                 
                 app = Client(
                     f"temp_session_{acc['id']}",
@@ -591,12 +583,42 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     chat_id = chat.id
                     await app.join_chat(chat_id)
                 
-                # وارد شدن به ویس چت و پخش رسانه
-                joined = await join_voice_chat_and_play(app, chat_id, media_path, is_mp3)
-                
-                if joined:
+                # وارد شدن به ویس چت و پخش رسانه (با مدیریت خطا)
+                try:
+                    from pytgcalls import PyTgCalls
+                    from pytgcalls.types import AudioQuality
+                    from pytgcalls.types.input_stream import AudioStream, InputAudioStream
+                    
+                    call = PyTgCalls(app)
+                    await call.start()
+                    
+                    if is_mp3:
+                        await call.join_group_call(
+                            chat_id,
+                            AudioStream(
+                                InputAudioStream(
+                                    media_path,
+                                    audio_parameters=AudioQuality.HIGH
+                                )
+                            )
+                        )
+                    else:
+                        from pytgcalls.types import VideoQuality
+                        from pytgcalls.types.input_stream import VideoStream, InputVideoStream
+                        await call.join_group_call(
+                            chat_id,
+                            VideoStream(
+                                InputVideoStream(
+                                    media_path,
+                                    video_parameters=VideoQuality.HIGH
+                                )
+                            )
+                        )
+                    
+                    await call.stop()
                     success_count += 1
-                else:
+                except Exception as e:
+                    print(f"خطا در پخش: {e}")
                     fail_count += 1
                 
                 await app.disconnect()
