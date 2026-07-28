@@ -553,7 +553,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
-    # ========== پخش در ویس چت گروه با py-tgcalls ==========
+    # ========== پخش در ویس چت گروه ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
