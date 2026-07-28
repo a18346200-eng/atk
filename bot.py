@@ -5,41 +5,38 @@ import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# تنظیم لاگ
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-# توکن ربات
 TOKEN = os.getenv('TOKEN')
 if not TOKEN:
     TOKEN = "8860863617:AAFizT8wFBJFt4uq7U9NpGfK_jwahrA35_o"
 
-# شناسه سازنده
 OWNER_ID = 7803165903
-
-# اطلاعات API برای pyrogram
 API_ID = 37160656
 API_HASH = "c75ef3eadae1ffb6cad9d6736d0e2323"
 
-# متغیرهای موقت
 user_sessions = {}
 
-# پاک کردن Webhook
+# پاک کردن Webhook با چند بار تلاش
 def delete_webhook():
-    try:
-        response = httpx.post(
-            f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
-            json={"drop_pending_updates": True},
-            timeout=30
-        )
-        if response.json().get('ok'):
-            print("✅ Webhook پاک شد")
-    except Exception as e:
-        print(f"⚠️ خطا: {e}")
+    for i in range(5):
+        try:
+            response = httpx.post(
+                f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
+                json={"drop_pending_updates": True},
+                timeout=30
+            )
+            if response.json().get('ok'):
+                print(f"✅ Webhook پاک شد (تلاش {i+1})")
+                return True
+        except Exception as e:
+            print(f"⚠️ تلاش {i+1} ناموفق: {e}")
+        time.sleep(2)
+    return False
 
-# متن استارت
 OWNER_START_TEXT = """
 🌟 <b>سازنده ربات عزیز به ربات ZX خوش آمدید!</b> 🌹
 
@@ -54,10 +51,8 @@ OWNER_START_TEXT = """
 
 NORMAL_START_TEXT = "⛔ <b>دسترسی محدود!</b>"
 
-# هندلر start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    
     if user_id == OWNER_ID:
         keyboard = [
             [InlineKeyboardButton("➕ افزودن اکانت", callback_data='add_account')],
@@ -72,7 +67,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(NORMAL_START_TEXT, parse_mode='HTML')
 
-# هندلر دکمه‌ها
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
@@ -89,7 +83,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📱 شماره تلفن خود را ارسال کنید:\nمثال: +989123456789\n\nبرای لغو: /cancel",
             parse_mode='HTML'
         )
-    
     elif query.data == 'settings':
         keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]]
         await query.edit_message_text(
@@ -97,7 +90,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    
     elif query.data == 'attack':
         keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]]
         await query.edit_message_text(
@@ -105,7 +97,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    
     elif query.data == 'back_to_menu':
         keyboard = [
             [InlineKeyboardButton("➕ افزودن اکانت", callback_data='add_account')],
@@ -118,10 +109,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-# هندلر پیام‌ها
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    
     if user_id != OWNER_ID or user_id not in user_sessions:
         return
     
@@ -181,7 +170,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         pass
                 del user_sessions[user_id]
 
-# هندلر cancel
 async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in user_sessions:
@@ -195,18 +183,16 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("ℹ️ هیچ عملیاتی وجود ندارد!")
 
-# اجرای اصلی - بدون asyncio
 if __name__ == '__main__':
     try:
+        # پاک کردن Webhook با چند بار تلاش
         delete_webhook()
-        time.sleep(2)
+        time.sleep(3)
         
         print("🚀 ربات در حال راه‌اندازی...")
         
-        # ساخت اپلیکیشن
         application = Application.builder().token(TOKEN).build()
         
-        # اضافه کردن هندلرها
         application.add_handler(CommandHandler('start', start))
         application.add_handler(CommandHandler('cancel', cancel_command))
         application.add_handler(CallbackQueryHandler(button_callback))
@@ -215,8 +201,11 @@ if __name__ == '__main__':
         print(f"✅ ربات با موفقیت راه‌اندازی شد!")
         print(f"👤 سازنده: {OWNER_ID}")
         
-        # اجرا با run_polling (این کار رو خودش انجام میده)
-        application.run_polling(drop_pending_updates=True)
+        # استفاده از run_polling با تنظیمات خاص
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=['message', 'callback_query']
+        )
         
     except Exception as e:
         print(f"❌ خطا: {e}")
