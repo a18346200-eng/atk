@@ -352,7 +352,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id != OWNER_ID:
         return
     
-    # ========== ساخت اکانت ==========
+    # ========== ساخت اکانت با مدیریت خطا ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'phone':
         text = update.message.text.strip()
         if not text.startswith('+') or not text[1:].isdigit():
@@ -374,16 +374,62 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sent_code = await app.send_code(text)
             user_sessions[user_id]['client'] = app
             user_sessions[user_id]['phone_code_hash'] = sent_code.phone_code_hash
-            await update.message.reply_text(f"📨 کد تایید به {text} ارسال شد. کد ۵ رقمی را وارد کنید:")
+            
+            # ذخیره زمان ارسال کد
+            user_sessions[user_id]['code_sent_time'] = time.time()
+            
+            await update.message.reply_text(
+                f"📨 <b>کد تایید ارسال شد!</b>\n\n"
+                f"◄ کد ۵ رقمی به شماره <code>{text}</code> ارسال شد.\n"
+                f"◂ لطفاً کد دریافتی را وارد کنید.\n"
+                f"⚠️ <b>توجه:</b> کد فقط ۵ دقیقه اعتبار داره!\n\n"
+                f"⫸ برای لغو: /cancel",
+                parse_mode='HTML'
+            )
         except Exception as e:
-            await update.message.reply_text(f"❌ خطا: {str(e)}")
-            del user_sessions[user_id]
+            error_msg = str(e)
+            if "FLOOD_WAIT" in error_msg:
+                await update.message.reply_text(
+                    f"❌ <b>زیاد درخواست دادی!</b>\n\n"
+                    f"◄ خطا: <code>{error_msg}</code>\n"
+                    "◄ لطفاً چند دقیقه صبر کن و دوباره تلاش کن.",
+                    parse_mode='HTML'
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ <b>خطا در ارسال کد!</b>\n\n"
+                    f"◄ خطا: <code>{error_msg}</code>\n\n"
+                    "◄ لطفاً شماره و API را بررسی کن.\n"
+                    "⫸ برای شروع مجدد /start را بزن.",
+                    parse_mode='HTML'
+                )
+            if user_id in user_sessions:
+                del user_sessions[user_id]
         return
     
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'code':
         code = update.message.text.strip()
         if not code.isdigit() or len(code) != 5:
             await update.message.reply_text("❌ کد باید ۵ رقم باشد!")
+            return
+        
+        # بررسی زمان ارسال کد (۵ دقیقه)
+        code_sent_time = user_sessions[user_id].get('code_sent_time', 0)
+        if time.time() - code_sent_time > 300:  # ۵ دقیقه
+            await update.message.reply_text(
+                "❌ <b>کد منقضی شده!</b>\n\n"
+                "◄ زمان ۵ دقیقه تمام شده.\n"
+                "◄ لطفاً دوباره از اول شروع کن.\n"
+                "⫸ /start را بزن و دوباره تلاش کن.",
+                parse_mode='HTML'
+            )
+            if user_id in user_sessions:
+                if 'client' in user_sessions[user_id]:
+                    try:
+                        await user_sessions[user_id]['client'].disconnect()
+                    except:
+                        pass
+                del user_sessions[user_id]
             return
         
         try:
@@ -411,10 +457,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
             await app.disconnect()
-            del user_sessions[user_id]
-        except Exception as e:
-            await update.message.reply_text(f"❌ خطا در ساخت سشن: {str(e)}")
             if user_id in user_sessions:
+                del user_sessions[user_id]
+        except Exception as e:
+            error_msg = str(e)
+            if "PHONE_CODE_EXPIRED" in error_msg:
+                await update.message.reply_text(
+                    f"❌ <b>کد منقضی شده!</b>\n\n"
+                    "◄ کد وارد شده معتبر نیست.\n"
+                    "◄ لطفاً دوباره از اول شروع کن.\n"
+                    "⫸ /start را بزن و دوباره تلاش کن.",
+                    parse_mode='HTML'
+                )
+            elif "FLOOD_WAIT" in error_msg:
+                await update.message.reply_text(
+                    f"❌ <b>زیاد درخواست دادی!</b>\n\n"
+                    f"◄ خطا: <code>{error_msg}</code>\n"
+                    "◄ لطفاً چند دقیقه صبر کن و دوباره تلاش کن.",
+                    parse_mode='HTML'
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ <b>خطا در ساخت سشن!</b>\n\n"
+                    f"◄ خطا: <code>{error_msg}</code>\n"
+                    "⫸ /start را بزن و دوباره تلاش کن.",
+                    parse_mode='HTML'
+                )
+            if user_id in user_sessions:
+                if 'client' in user_sessions[user_id]:
+                    try:
+                        await user_sessions[user_id]['client'].disconnect()
+                    except:
+                        pass
                 del user_sessions[user_id]
         return
     
@@ -480,7 +554,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
-    # ========== پخش در ویس چت گروه (نسخه جدید و بهبود یافته) ==========
+    # ========== پخش در ویس چت گروه ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
@@ -519,7 +593,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         success_count = 0
         fail_count = 0
-        error_messages = []
         
         for acc in accounts:
             try:
@@ -528,8 +601,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 from py_tgcalls.types import AudioQuality, VideoQuality
                 from py_tgcalls.types.input_stream import AudioStream, VideoStream, InputAudioStream, InputVideoStream
                 
-                print(f"🔄 شروع با اکانت: {acc.get('phone')}")
-                
                 app = Client(
                     f"play_session_{acc['id']}",
                     api_id=API_ID,
@@ -537,86 +608,54 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     session_string=acc['session']
                 )
                 await app.connect()
-                print(f"✅ اکانت {acc.get('phone')} متصل شد")
                 
-                # جوین شدن در گروه - روش جدید
+                # جوین شدن در گروه
                 try:
-                    # ابتدا با لینک جوین میشیم
                     chat = await app.join_chat(link)
                     chat_id = chat.id
-                    print(f"✅ جوین شد با لینک: {chat_id}")
-                except Exception as e:
-                    print(f"⚠️ خطا در جوین با لینک: {e}")
-                    try:
-                        # اگر لینک خصوصی بود، با آیدی امتحان میکنیم
-                        chat = await app.get_chat(link)
-                        chat_id = chat.id
-                        await app.join_chat(chat_id)
-                        print(f"✅ جوین شد با آیدی: {chat_id}")
-                    except Exception as e2:
-                        print(f"❌ خطا در جوین با آیدی: {e2}")
-                        error_messages.append(f"خطا در جوین اکانت {acc.get('phone')}: {e2}")
-                        fail_count += 1
-                        continue
+                except:
+                    chat = await app.get_chat(link)
+                    chat_id = chat.id
+                    await app.join_chat(chat_id)
                 
                 # پخش در ویس چت
-                try:
-                    call = PyTgCalls(app)
-                    await call.start()
-                    print(f"✅ تماس شروع شد برای اکانت {acc.get('phone')}")
-                    
-                    if is_mp3:
-                        await call.join_group_call(
-                            chat_id,
-                            AudioStream(
-                                InputAudioStream(
-                                    media_path,
-                                    audio_parameters=AudioQuality.HIGH
-                                )
-                            )
-                        )
-                        print(f"✅ MP3 پخش شد در اکانت {acc.get('phone')}")
-                    else:
-                        await call.join_group_call(
-                            chat_id,
-                            VideoStream(
-                                InputVideoStream(
-                                    media_path,
-                                    video_parameters=VideoQuality.HIGH
-                                )
-                            )
-                        )
-                        print(f"✅ MP4 پخش شد در اکانت {acc.get('phone')}")
-                    
-                    success_count += 1
-                    
-                except Exception as e:
-                    print(f"❌ خطا در پخش با اکانت {acc.get('phone')}: {e}")
-                    error_messages.append(f"خطا در پخش اکانت {acc.get('phone')}: {e}")
-                    fail_count += 1
+                call = PyTgCalls(app)
+                await call.start()
                 
-                await app.disconnect()
+                if is_mp3:
+                    await call.join_group_call(
+                        chat_id,
+                        AudioStream(
+                            InputAudioStream(
+                                media_path,
+                                audio_parameters=AudioQuality.HIGH
+                            )
+                        )
+                    )
+                else:
+                    await call.join_group_call(
+                        chat_id,
+                        VideoStream(
+                            InputVideoStream(
+                                media_path,
+                                video_parameters=VideoQuality.HIGH
+                            )
+                        )
+                    )
+                
+                success_count += 1
                 
             except Exception as e:
-                print(f"❌ خطای کلی در اکانت {acc.get('phone')}: {e}")
-                error_messages.append(f"خطای کلی {acc.get('phone')}: {e}")
                 fail_count += 1
-        
-        # گزارش نهایی
-        result_text = f"✅ <b>عملیات پخش در ویس چت کامل شد!</b>\n\n"
-        result_text += f"🔗 <b>لینک:</b> {link}\n"
-        result_text += f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
-        result_text += f"✅ <b>موفق:</b> {success_count} اکانت\n"
-        result_text += f"❌ <b>ناموفق:</b> {fail_count} اکانت\n"
-        result_text += f"📊 <b>مجموع:</b> {len(accounts)} اکانت\n"
-        
-        if error_messages:
-            result_text += f"\n⚠️ <b>خطاها:</b>\n"
-            for msg in error_messages[:3]:  # فقط ۳ خطا رو نشون بده
-                result_text += f"◄ {msg}\n"
+                print(f"❌ خطا در اکانت {acc.get('phone')}: {e}")
         
         await update.message.reply_text(
-            result_text,
+            f"✅ <b>عملیات پخش در ویس چت کامل شد!</b>\n\n"
+            f"🔗 <b>لینک:</b> {link}\n"
+            f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
+            f"✅ <b>موفق:</b> {success_count} اکانت\n"
+            f"❌ <b>ناموفق:</b> {fail_count} اکانت\n"
+            f"📊 <b>مجموع:</b> {len(accounts)} اکانت",
             parse_mode='HTML'
         )
         
