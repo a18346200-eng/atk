@@ -17,9 +17,9 @@ API_ID = 29811798
 API_HASH = "ef5847a43a978d6883b97b0caeb81736"
 
 user_sessions = {}
-accounts = []  # لیست اکانت‌های ساخته شده
-mp3_files = []  # لیست فایل‌های MP3
-mp4_files = []  # لیست فایل‌های MP4
+accounts = []
+mp3_files = []
+mp4_files = []
 
 # ذخیره و بارگذاری داده‌ها
 DATA_FILE = "data.json"
@@ -49,6 +49,7 @@ def save_data():
 
 load_data()
 
+# ✅ اصلاح شده - بدون {len(accounts)}
 OWNER_START_TEXT = """
 🌟 <b>سازنده ربات عزیز به ربات ZX خوش آمدید!</b> 🌹
 
@@ -59,7 +60,6 @@ OWNER_START_TEXT = """
 🔹 <b>حمله:</b> برای جوین شدن در گروه یا کانال
 
 ⚡ <b>وضعیت ربات:</b> فعال ✅
-📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}
 """
 
 NORMAL_START_TEXT = "⛔ <b>دسترسی محدود!</b>"
@@ -72,8 +72,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
             [InlineKeyboardButton("💥 حمله", callback_data='attack')]
         ]
+        # ✅ اضافه کردن تعداد اکانت‌ها به صورت جداگانه
+        text = OWNER_START_TEXT + f"\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}"
         await update.message.reply_text(
-            OWNER_START_TEXT.format(len(accounts)),
+            text,
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -182,6 +184,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif query.data == 'attack_group':
+        if len(accounts) == 0:
+            await query.edit_message_text(
+                "❌ <b>هیچ اکانتی وجود ندارد!</b>\n\n"
+                "◄ لطفاً ابتدا از بخش <b>افزودن اکانت</b> یک اکانت اضافه کنید.",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
+            )
+            return
+        
         user_sessions[user_id] = {'step': 'attack_group'}
         await query.edit_message_text(
             "👥 <b>حمله به گروه</b>\n\n"
@@ -195,6 +206,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif query.data == 'attack_channel':
+        if len(accounts) == 0:
+            await query.edit_message_text(
+                "❌ <b>هیچ اکانتی وجود ندارد!</b>\n\n"
+                "◄ لطفاً ابتدا از بخش <b>افزودن اکانت</b> یک اکانت اضافه کنید.",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
+            )
+            return
+        
         user_sessions[user_id] = {'step': 'attack_channel'}
         await query.edit_message_text(
             "📢 <b>حمله به کانال</b>\n\n"
@@ -213,8 +233,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
             [InlineKeyboardButton("💥 حمله", callback_data='attack')]
         ]
+        text = OWNER_START_TEXT + f"\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}"
         await query.edit_message_text(
-            OWNER_START_TEXT.format(len(accounts)),
+            text,
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -266,7 +287,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await app.sign_in(phone_number=phone, phone_code_hash=phone_code_hash, phone_code=code)
             session_string = await app.export_session_string()
             
-            # ذخیره اطلاعات اکانت
             account_info = {
                 'phone': phone,
                 'session': session_string,
@@ -346,11 +366,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group':
         link = update.message.text.strip()
         
-        if not accounts:
-            await update.message.reply_text("❌ هیچ اکانتی برای حمله وجود ندارد! ابتدا اکانت اضافه کنید.")
-            del user_sessions[user_id]
-            return
-        
         await update.message.reply_text(
             f"🔄 <b>در حال پردازش...</b>\n\n"
             f"🔗 لینک: {link}\n"
@@ -359,7 +374,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
         
-        # جوین شدن با همه اکانت‌ها
         success_count = 0
         fail_count = 0
         
@@ -395,11 +409,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_channel':
         link = update.message.text.strip()
         
-        if not accounts:
-            await update.message.reply_text("❌ هیچ اکانتی برای حمله وجود ندارد! ابتدا اکانت اضافه کنید.")
-            del user_sessions[user_id]
-            return
-        
         await update.message.reply_text(
             f"🔄 <b>در حال پردازش...</b>\n\n"
             f"🔗 لینک: {link}\n"
@@ -408,7 +417,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
         
-        # جوین شدن با همه اکانت‌ها
         success_count = 0
         fail_count = 0
         
