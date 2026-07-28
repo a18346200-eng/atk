@@ -2,8 +2,7 @@ import os
 import logging
 import httpx
 import time
-import asyncio
-from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # تنظیم لاگ
@@ -28,16 +27,15 @@ API_HASH = "c75ef3eadae1ffb6cad9d6736d0e2323"
 user_sessions = {}
 
 # پاک کردن Webhook
-async def delete_webhook():
+def delete_webhook():
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
-                json={"drop_pending_updates": True},
-                timeout=30
-            )
-            if response.json().get('ok'):
-                print("✅ Webhook پاک شد")
+        response = httpx.post(
+            f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
+            json={"drop_pending_updates": True},
+            timeout=30
+        )
+        if response.json().get('ok'):
+            print("✅ Webhook پاک شد")
     except Exception as e:
         print(f"⚠️ خطا: {e}")
 
@@ -197,27 +195,28 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("ℹ️ هیچ عملیاتی وجود ندارد!")
 
-# اجرای اصلی
-async def main():
-    await delete_webhook()
-    time.sleep(2)
-    
-    print("🚀 ربات در حال راه‌اندازی...")
-    
-    application = Application.builder().token(TOKEN).build()
-    
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('cancel', cancel_command))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    print(f"✅ ربات با موفقیت راه‌اندازی شد!")
-    print(f"👤 سازنده: {OWNER_ID}")
-    
-    await application.run_polling(drop_pending_updates=True)
-
+# اجرای اصلی - بدون asyncio
 if __name__ == '__main__':
     try:
-        asyncio.run(main())
+        delete_webhook()
+        time.sleep(2)
+        
+        print("🚀 ربات در حال راه‌اندازی...")
+        
+        # ساخت اپلیکیشن
+        application = Application.builder().token(TOKEN).build()
+        
+        # اضافه کردن هندلرها
+        application.add_handler(CommandHandler('start', start))
+        application.add_handler(CommandHandler('cancel', cancel_command))
+        application.add_handler(CallbackQueryHandler(button_callback))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
+        print(f"✅ ربات با موفقیت راه‌اندازی شد!")
+        print(f"👤 سازنده: {OWNER_ID}")
+        
+        # اجرا با run_polling (این کار رو خودش انجام میده)
+        application.run_polling(drop_pending_updates=True)
+        
     except Exception as e:
         print(f"❌ خطا: {e}")
