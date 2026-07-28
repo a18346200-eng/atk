@@ -3,6 +3,7 @@ import logging
 import httpx
 import time
 import json
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
@@ -20,8 +21,8 @@ user_sessions = {}
 accounts = []
 mp3_files = []
 mp4_files = []
+active_attacks = {}  # ذخیره اطلاعات حمله‌های فعال
 
-# ذخیره و بارگذاری داده‌ها
 DATA_FILE = "data.json"
 
 def load_data():
@@ -49,7 +50,6 @@ def save_data():
 
 load_data()
 
-# ✅ اصلاح شده - بدون {len(accounts)}
 OWNER_START_TEXT = """
 🌟 <b>سازنده ربات عزیز به ربات ZX خوش آمدید!</b> 🌹
 
@@ -57,7 +57,7 @@ OWNER_START_TEXT = """
 
 🔹 <b>افزودن اکانت:</b> برای ساخت سشن تلگرام
 🔹 <b>تنظیمات:</b> مدیریت فایل‌های MP3 و MP4
-🔹 <b>حمله:</b> برای جوین شدن در گروه یا کانال
+🔹 <b>حمله:</b> برای جوین شدن در گروه یا کانال و پخش رسانه
 
 ⚡ <b>وضعیت ربات:</b> فعال ✅
 """
@@ -72,7 +72,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
             [InlineKeyboardButton("💥 حمله", callback_data='attack')]
         ]
-        # ✅ اضافه کردن تعداد اکانت‌ها به صورت جداگانه
         text = OWNER_START_TEXT + f"\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}"
         await update.message.reply_text(
             text,
@@ -95,6 +94,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ========== بخش افزودن اکانت ==========
     if query.data == 'add_account':
         user_sessions[user_id] = {'step': 'phone', 'api_id': API_ID, 'api_hash': API_HASH}
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]]
         await query.edit_message_text(
             "📱 <b>مرحله ۱: وارد کردن شماره تلفن</b>\n\n"
             "◄ لطفاً <b>شماره تلفن</b> اکانت تلگرام خود را وارد کنید.\n"
@@ -102,7 +102,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔑 API_ID: <code>{API_ID}</code>\n"
             f"🔑 API_HASH: <code>{API_HASH}</code>\n\n"
             "⫸ برای لغو: /cancel",
-            parse_mode='HTML'
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
     # ========== بخش تنظیمات ==========
@@ -111,6 +112,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🎵 افزودن MP3", callback_data='add_mp3')],
             [InlineKeyboardButton("🎬 افزودن MP4", callback_data='add_mp4')],
             [InlineKeyboardButton("📋 لیست اکانت‌ها", callback_data='list_accounts')],
+            [InlineKeyboardButton("📋 لیست MP3", callback_data='list_mp3')],
+            [InlineKeyboardButton("📋 لیست MP4", callback_data='list_mp4')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
         ]
         
@@ -129,8 +132,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'list_accounts':
         if not accounts:
             await query.edit_message_text(
-                "📋 <b>لیست اکانت‌ها</b>\n\n"
-                "❌ هنوز هیچ اکانتی اضافه نشده!",
+                "📋 <b>لیست اکانت‌ها</b>\n\n❌ هنوز هیچ اکانتی اضافه نشده!",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]])
             )
@@ -138,8 +140,40 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = "📋 <b>لیست اکانت‌های اضافه شده:</b>\n\n"
             for i, acc in enumerate(accounts, 1):
                 text += f"{i}. 📱 {acc.get('phone', 'نامشخص')}\n"
-                text += f"   🆔 ID: {acc.get('id', 'نامشخص')}\n\n"
-            
+            await query.edit_message_text(
+                text,
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]])
+            )
+    
+    elif query.data == 'list_mp3':
+        if not mp3_files:
+            await query.edit_message_text(
+                "📋 <b>لیست MP3</b>\n\n❌ هیچ MP3 ای اضافه نشده!",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]])
+            )
+        else:
+            text = "🎵 <b>لیست MP3های اضافه شده:</b>\n\n"
+            for i, mp3 in enumerate(mp3_files, 1):
+                text += f"{i}. 🎵 {mp3.get('name', 'نامشخص')}\n"
+            await query.edit_message_text(
+                text,
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]])
+            )
+    
+    elif query.data == 'list_mp4':
+        if not mp4_files:
+            await query.edit_message_text(
+                "📋 <b>لیست MP4</b>\n\n❌ هیچ MP4 ای اضافه نشده!",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]])
+            )
+        else:
+            text = "🎬 <b>لیست MP4های اضافه شده:</b>\n\n"
+            for i, mp4 in enumerate(mp4_files, 1):
+                text += f"{i}. 🎬 {mp4.get('name', 'نامشخص')}\n"
             await query.edit_message_text(
                 text,
                 parse_mode='HTML',
@@ -148,22 +182,26 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == 'add_mp3':
         user_sessions[user_id] = {'step': 'mp3'}
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]
         await query.edit_message_text(
             "🎵 <b>افزودن MP3</b>\n\n"
             "◄ لطفاً فایل <b>MP3</b> خود را ارسال کنید.\n"
-            "◂ ربات فایل را ذخیره کرده و به سشن‌ها ارسال خواهد کرد.\n\n"
+            "◂ ربات فایل را کامل ذخیره کرده و برای پخش استفاده خواهد کرد.\n\n"
             "⫸ برای لغو: /cancel",
-            parse_mode='HTML'
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
     elif query.data == 'add_mp4':
         user_sessions[user_id] = {'step': 'mp4'}
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]
         await query.edit_message_text(
             "🎬 <b>افزودن MP4</b>\n\n"
             "◄ لطفاً فایل <b>MP4</b> خود را ارسال کنید.\n"
-            "◂ ربات فایل را ذخیره کرده و به سشن‌ها ارسال خواهد کرد.\n\n"
+            "◂ ربات فایل را کامل ذخیره کرده و برای پخش استفاده خواهد کرد.\n\n"
             "⫸ برای لغو: /cancel",
-            parse_mode='HTML'
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
     # ========== بخش حمله ==========
@@ -171,14 +209,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("👥 حمله به گروه", callback_data='attack_group')],
             [InlineKeyboardButton("📢 حمله به کانال", callback_data='attack_channel')],
+            [InlineKeyboardButton("⏹️ پایان حمله", callback_data='stop_attack')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
         ]
         await query.edit_message_text(
             "💥 <b>بخش حمله</b>\n\n"
             "◄ لطفاً نوع حمله رو انتخاب کنید:\n\n"
-            "🔹 <b>حمله به گروه:</b> سشن وارد گروه میشه\n"
-            "🔹 <b>حمله به کانال:</b> سشن وارد کانال میشه\n\n"
-            "⚠️ <b>توجه:</b> فقط اکانت‌های اضافه شده قابلیت جوین شدن دارن.",
+            "🔹 <b>حمله به گروه:</b> جوین شده و رسانه پخش میکنه\n"
+            "🔹 <b>حمله به کانال:</b> جوین شده و رسانه پخش میکنه\n"
+            "🔹 <b>پایان حمله:</b> متوقف کردن پخش و خروج از گروه/کانال\n\n"
+            f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n"
+            f"🎵 <b>MP3:</b> {len(mp3_files)} | 🎬 <b>MP4:</b> {len(mp4_files)}",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -193,16 +234,29 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
-        user_sessions[user_id] = {'step': 'attack_group'}
+        if len(mp3_files) == 0 and len(mp4_files) == 0:
+            await query.edit_message_text(
+                "❌ <b>هیچ فایل رسانه‌ای وجود ندارد!</b>\n\n"
+                "◄ لطفاً ابتدا از بخش <b>تنظیمات</b> فایل MP3 یا MP4 اضافه کنید.",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
+            )
+            return
+        
+        keyboard = []
+        for i, mp3 in enumerate(mp3_files, 1):
+            keyboard.append([InlineKeyboardButton(f"🎵 {mp3.get('name', f'MP3 {i}')}", callback_data=f'play_mp3_{i-1}')])
+        for i, mp4 in enumerate(mp4_files, 1):
+            keyboard.append([InlineKeyboardButton(f"🎬 {mp4.get('name', f'MP4 {i}')}", callback_data=f'play_mp4_{i-1}')])
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data='attack')])
+        
+        user_sessions[user_id] = {'step': 'attack_group_select'}
         await query.edit_message_text(
-            "👥 <b>حمله به گروه</b>\n\n"
-            "◄ لطفاً <b>لینک گروه</b> را وارد کنید.\n"
-            "◂ چه لینک عمومی و چه لینک خصوصی فرقی نداره.\n\n"
-            "◂ مثال: <code>https://t.me/joinchat/abc123</code>\n"
-            "◂ یا: <code>https://t.me/groupusername</code>\n\n"
-            f"📊 <b>تعداد اکانت‌های موجود:</b> {len(accounts)}\n\n"
-            "⫸ برای لغو: /cancel",
-            parse_mode='HTML'
+            "🎵 <b>انتخاب رسانه برای پخش در گروه</b>\n\n"
+            "◄ لطفاً یکی از رسانه‌های زیر رو انتخاب کنید:\n\n"
+            f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}",
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
     elif query.data == 'attack_channel':
@@ -215,17 +269,75 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
-        user_sessions[user_id] = {'step': 'attack_channel'}
+        if len(mp3_files) == 0 and len(mp4_files) == 0:
+            await query.edit_message_text(
+                "❌ <b>هیچ فایل رسانه‌ای وجود ندارد!</b>\n\n"
+                "◄ لطفاً ابتدا از بخش <b>تنظیمات</b> فایل MP3 یا MP4 اضافه کنید.",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
+            )
+            return
+        
+        keyboard = []
+        for i, mp3 in enumerate(mp3_files, 1):
+            keyboard.append([InlineKeyboardButton(f"🎵 {mp3.get('name', f'MP3 {i}')}", callback_data=f'play_mp3_{i-1}')])
+        for i, mp4 in enumerate(mp4_files, 1):
+            keyboard.append([InlineKeyboardButton(f"🎬 {mp4.get('name', f'MP4 {i}')}", callback_data=f'play_mp4_{i-1}')])
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data='attack')])
+        
+        user_sessions[user_id] = {'step': 'attack_channel_select'}
         await query.edit_message_text(
-            "📢 <b>حمله به کانال</b>\n\n"
-            "◄ لطفاً <b>لینک کانال</b> را وارد کنید.\n"
-            "◂ چه لینک عمومی و چه لینک خصوصی فرقی نداره.\n\n"
-            "◂ مثال: <code>https://t.me/joinchat/abc123</code>\n"
-            "◂ یا: <code>https://t.me/channelusername</code>\n\n"
-            f"📊 <b>تعداد اکانت‌های موجود:</b> {len(accounts)}\n\n"
-            "⫸ برای لغو: /cancel",
+            "🎵 <b>انتخاب رسانه برای پخش در کانال</b>\n\n"
+            "◄ لطفاً یکی از رسانه‌های زیر رو انتخاب کنید:\n\n"
+            f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}",
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    elif query.data.startswith('play_mp3_'):
+        index = int(query.data.split('_')[2])
+        if index < len(mp3_files):
+            user_sessions[user_id]['selected_mp3'] = index
+            step = user_sessions[user_id].get('step', '')
+            if 'group' in step:
+                user_sessions[user_id]['step'] = 'attack_group_link'
+            else:
+                user_sessions[user_id]['step'] = 'attack_channel_link'
+            
+            await query.edit_message_text(
+                f"✅ <b>رسانه انتخاب شد:</b> {mp3_files[index].get('name', 'MP3')}\n\n"
+                "◄ لطفاً <b>لینک گروه/کانال</b> را وارد کنید.\n"
+                "◂ مثال: <code>https://t.me/joinchat/abc123</code>\n\n"
+                "⫸ برای لغو: /cancel",
+                parse_mode='HTML'
+            )
+    
+    elif query.data.startswith('play_mp4_'):
+        index = int(query.data.split('_')[2])
+        if index < len(mp4_files):
+            user_sessions[user_id]['selected_mp4'] = index
+            step = user_sessions[user_id].get('step', '')
+            if 'group' in step:
+                user_sessions[user_id]['step'] = 'attack_group_link'
+            else:
+                user_sessions[user_id]['step'] = 'attack_channel_link'
+            
+            await query.edit_message_text(
+                f"✅ <b>رسانه انتخاب شد:</b> {mp4_files[index].get('name', 'MP4')}\n\n"
+                "◄ لطفاً <b>لینک گروه/کانال</b> را وارد کنید.\n"
+                "◂ مثال: <code>https://t.me/joinchat/abc123</code>\n\n"
+                "⫸ برای لغو: /cancel",
+                parse_mode='HTML'
+            )
+    
+    elif query.data == 'stop_attack':
+        await query.edit_message_text(
+            "⏹️ <b>پایان حمله</b>\n\n"
+            "◄ در حال متوقف کردن تمام حمله‌ها و خروج از گروه/کانال‌ها...",
             parse_mode='HTML'
         )
+        
+        await stop_all_attacks(update, context)
     
     elif query.data == 'back_to_menu':
         keyboard = [
@@ -239,6 +351,41 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+
+async def stop_all_attacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """متوقف کردن تمام حمله‌ها و خروج از گروه/کانال‌ها"""
+    try:
+        for acc in accounts:
+            try:
+                from pyrogram import Client
+                app = Client(
+                    f"temp_session_{acc['id']}",
+                    api_id=API_ID,
+                    api_hash=API_HASH,
+                    session_string=acc['session']
+                )
+                await app.connect()
+                
+                # خروج از همه گروه‌ها و کانال‌ها
+                async for dialog in app.get_dialogs():
+                    if dialog.chat.type in ["group", "supergroup", "channel"]:
+                        try:
+                            await app.leave_chat(dialog.chat.id)
+                        except:
+                            pass
+                
+                await app.disconnect()
+            except:
+                pass
+        
+        await update.message.reply_text(
+            "✅ <b>حمله با موفقیت متوقف شد!</b>\n\n"
+            "◄ تمام اکانت‌ها از گروه‌ها و کانال‌ها خارج شدند.\n"
+            "◄ پخش رسانه متوقف شد.",
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا در توقف حمله: {str(e)}")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -299,7 +446,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"✅ <b>سشن ساخته شد!</b>\n\n"
                 f"📱 <b>شماره:</b> <code>{phone}</code>\n"
                 f"🆔 <b>شناسه:</b> {len(accounts)}\n\n"
-                f"🔑 <b>سشن:</b>\n<code>{session_string}</code>\n\n"
                 f"📊 <b>تعداد کل اکانت‌ها:</b> {len(accounts)}",
                 parse_mode='HTML'
             )
@@ -316,11 +462,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'mp3':
         if update.message.audio:
             file = update.message.audio
+            # دانلود کامل فایل
+            file_obj = await context.bot.get_file(file.file_id)
+            file_path = f"mp3_{int(time.time())}_{file.file_name or 'unknown.mp3'}"
+            await file_obj.download_to_drive(file_path)
+            
             file_info = {
                 'name': file.file_name or 'Unknown',
                 'file_id': file.file_id,
                 'duration': file.duration,
-                'size': file.file_size
+                'size': file.file_size,
+                'path': file_path
             }
             mp3_files.append(file_info)
             save_data()
@@ -328,6 +480,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"✅ <b>MP3 با موفقیت اضافه شد!</b>\n\n"
                 f"🎵 <b>نام:</b> {file_info['name']}\n"
                 f"⏱️ <b>مدت:</b> {file_info['duration']} ثانیه\n"
+                f"💾 <b>حجم:</b> {file_info['size']} بایت\n"
                 f"📊 <b>تعداد کل MP3:</b> {len(mp3_files)}",
                 parse_mode='HTML'
             )
@@ -340,13 +493,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'mp4':
         if update.message.video:
             file = update.message.video
+            # دانلود کامل فایل
+            file_obj = await context.bot.get_file(file.file_id)
+            file_path = f"mp4_{int(time.time())}_{file.file_name or 'unknown.mp4'}"
+            await file_obj.download_to_drive(file_path)
+            
             file_info = {
                 'name': file.file_name or 'Unknown',
                 'file_id': file.file_id,
                 'duration': file.duration,
                 'size': file.file_size,
                 'width': file.width,
-                'height': file.height
+                'height': file.height,
+                'path': file_path
             }
             mp4_files.append(file_info)
             save_data()
@@ -354,6 +513,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"✅ <b>MP4 با موفقیت اضافه شد!</b>\n\n"
                 f"🎬 <b>نام:</b> {file_info['name']}\n"
                 f"⏱️ <b>مدت:</b> {file_info['duration']} ثانیه\n"
+                f"💾 <b>حجم:</b> {file_info['size']} بایت\n"
                 f"📊 <b>تعداد کل MP4:</b> {len(mp4_files)}",
                 parse_mode='HTML'
             )
@@ -363,12 +523,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # ========== حمله به گروه ==========
-    if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group':
+    if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
+        # دریافت رسانه انتخاب شده
+        media_index = user_sessions[user_id].get('selected_mp3')
+        is_mp3 = True
+        if media_index is None:
+            media_index = user_sessions[user_id].get('selected_mp4')
+            is_mp3 = False
+        
+        if media_index is None:
+            await update.message.reply_text("❌ رسانه‌ای انتخاب نشده! دوباره تلاش کنید.")
+            del user_sessions[user_id]
+            return
+        
+        media_file = mp3_files[media_index] if is_mp3 else mp4_files[media_index]
+        media_type = "MP3" if is_mp3 else "MP4"
+        
         await update.message.reply_text(
-            f"🔄 <b>در حال پردازش...</b>\n\n"
+            f"🔄 <b>در حال اجرای حمله به گروه...</b>\n\n"
             f"🔗 لینک: {link}\n"
+            f"🎵 رسانه: {media_file.get('name', 'Unknown')}\n"
             f"📊 تعداد اکانت‌ها: {len(accounts)}\n\n"
             "⏳ لطفاً صبر کنید...",
             parse_mode='HTML'
@@ -380,6 +556,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
+                from pyrogram.types import InputMediaAudio, InputMediaVideo
+                
                 app = Client(
                     f"temp_session_{acc['id']}",
                     api_id=API_ID,
@@ -387,7 +565,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     session_string=acc['session']
                 )
                 await app.connect()
-                await app.join_chat(link)
+                
+                # جوین شدن در گروه
+                chat = await app.join_chat(link)
+                
+                # ارسال و پخش رسانه در ویس چت
+                if is_mp3:
+                    await app.send_audio(chat.id, media_file['file_id'])
+                else:
+                    await app.send_video(chat.id, media_file['file_id'])
+                
                 await app.disconnect()
                 success_count += 1
             except Exception as e:
@@ -396,6 +583,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"✅ <b>عملیات حمله به گروه کامل شد!</b>\n\n"
             f"🔗 <b>لینک:</b> {link}\n"
+            f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
             f"✅ <b>موفق:</b> {success_count} اکانت\n"
             f"❌ <b>ناموفق:</b> {fail_count} اکانت\n"
             f"📊 <b>مجموع:</b> {len(accounts)} اکانت",
@@ -406,12 +594,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # ========== حمله به کانال ==========
-    if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_channel':
+    if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_channel_link':
         link = update.message.text.strip()
         
+        # دریافت رسانه انتخاب شده
+        media_index = user_sessions[user_id].get('selected_mp3')
+        is_mp3 = True
+        if media_index is None:
+            media_index = user_sessions[user_id].get('selected_mp4')
+            is_mp3 = False
+        
+        if media_index is None:
+            await update.message.reply_text("❌ رسانه‌ای انتخاب نشده! دوباره تلاش کنید.")
+            del user_sessions[user_id]
+            return
+        
+        media_file = mp3_files[media_index] if is_mp3 else mp4_files[media_index]
+        media_type = "MP3" if is_mp3 else "MP4"
+        
         await update.message.reply_text(
-            f"🔄 <b>در حال پردازش...</b>\n\n"
+            f"🔄 <b>در حال اجرای حمله به کانال...</b>\n\n"
             f"🔗 لینک: {link}\n"
+            f"🎵 رسانه: {media_file.get('name', 'Unknown')}\n"
             f"📊 تعداد اکانت‌ها: {len(accounts)}\n\n"
             "⏳ لطفاً صبر کنید...",
             parse_mode='HTML'
@@ -423,6 +627,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
+                
                 app = Client(
                     f"temp_session_{acc['id']}",
                     api_id=API_ID,
@@ -430,7 +635,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     session_string=acc['session']
                 )
                 await app.connect()
-                await app.join_chat(link)
+                
+                # جوین شدن در کانال
+                chat = await app.join_chat(link)
+                
+                # ارسال رسانه در کانال
+                if is_mp3:
+                    await app.send_audio(chat.id, media_file['file_id'])
+                else:
+                    await app.send_video(chat.id, media_file['file_id'])
+                
                 await app.disconnect()
                 success_count += 1
             except Exception as e:
@@ -439,6 +653,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"✅ <b>عملیات حمله به کانال کامل شد!</b>\n\n"
             f"🔗 <b>لینک:</b> {link}\n"
+            f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
             f"✅ <b>موفق:</b> {success_count} اکانت\n"
             f"❌ <b>ناموفق:</b> {fail_count} اکانت\n"
             f"📊 <b>مجموع:</b> {len(accounts)} اکانت",
@@ -465,8 +680,9 @@ if __name__ == '__main__':
     try:
         print("🚀 ربات در حال راه‌اندازی...")
         print(f"🔑 API_ID: {API_ID}")
-        print(f"🔑 API_HASH: {API_HASH}")
         print(f"📊 تعداد اکانت‌ها: {len(accounts)}")
+        print(f"🎵 تعداد MP3: {len(mp3_files)}")
+        print(f"🎬 تعداد MP4: {len(mp4_files)}")
         
         application = Application.builder().token(TOKEN).build()
         
