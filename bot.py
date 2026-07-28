@@ -20,7 +20,6 @@ user_sessions = {}
 accounts = []
 mp3_files = []
 mp4_files = []
-active_calls = {}
 
 DATA_FILE = "data.json"
 
@@ -553,7 +552,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
-    # ========== پخش در ویس چت گروه با pytgcalls ==========
+    # ========== پخش در ویس چت گروه ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
@@ -737,6 +736,3 @@ if __name__ == '__main__':
             drop_pending_updates=True,
             allowed_updates=['message', 'callback_query']
         )
-        
-    except Exception as e:
-        print(f"❌ خطا: {e}")
