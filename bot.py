@@ -10,7 +10,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-TOKEN = "8860863617:AAFizT8wFBJFt4uq7U9NpGfK_jwahrA35_o"
+TOKEN = "8576876988:AAGBLHEz9IAQa9NwgG6L8tWZnUQjUifxu10"
 OWNER_ID = 7803165903
 API_ID = 37160656
 API_HASH = "c75ef3eadae1ffb6cad9d6736d0e2323"
