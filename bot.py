@@ -10,32 +10,14 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-TOKEN = os.getenv('TOKEN')
-if not TOKEN:
-    TOKEN = "8860863617:AAFizT8wFBJFt4uq7U9NpGfK_jwahrA35_o"
-
+TOKEN = "8860863617:AAFizT8wFBJFt4uq7U9NpGfK_jwahrA35_o"
 OWNER_ID = 7803165903
 API_ID = 37160656
 API_HASH = "c75ef3eadae1ffb6cad9d6736d0e2323"
 
 user_sessions = {}
 
-# پاک کردن Webhook با چند بار تلاش
-def delete_webhook():
-    for i in range(5):
-        try:
-            response = httpx.post(
-                f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
-                json={"drop_pending_updates": True},
-                timeout=30
-            )
-            if response.json().get('ok'):
-                print(f"✅ Webhook پاک شد (تلاش {i+1})")
-                return True
-        except Exception as e:
-            print(f"⚠️ تلاش {i+1} ناموفق: {e}")
-        time.sleep(2)
-    return False
+print("🔄 در حال راه‌اندازی...")
 
 OWNER_START_TEXT = """
 🌟 <b>سازنده ربات عزیز به ربات ZX خوش آمدید!</b> 🌹
@@ -185,10 +167,6 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     try:
-        # پاک کردن Webhook با چند بار تلاش
-        delete_webhook()
-        time.sleep(3)
-        
         print("🚀 ربات در حال راه‌اندازی...")
         
         application = Application.builder().token(TOKEN).build()
@@ -201,7 +179,6 @@ if __name__ == '__main__':
         print(f"✅ ربات با موفقیت راه‌اندازی شد!")
         print(f"👤 سازنده: {OWNER_ID}")
         
-        # استفاده از run_polling با تنظیمات خاص
         application.run_polling(
             drop_pending_updates=True,
             allowed_updates=['message', 'callback_query']
