@@ -311,6 +311,7 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """متوقف کردن پخش در همه گروه‌ها"""
     try:
         from pyrogram import Client
+        from pytgcalls import PyTgCalls
         
         stopped_count = 0
         for acc in accounts:
@@ -323,22 +324,25 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
                 await app.connect()
                 
-                # فقط از گروه‌ها خارج میشیم
+                call = PyTgCalls(app)
+                await call.start()
+                
                 async for dialog in app.get_dialogs():
                     if dialog.chat.type in ["group", "supergroup"]:
                         try:
-                            await app.leave_chat(dialog.chat.id)
+                            await call.leave_group_call(dialog.chat.id)
                             stopped_count += 1
                         except:
                             pass
                 
+                await call.stop()
                 await app.disconnect()
             except:
                 pass
         
         await update.message.reply_text(
             f"✅ <b>پخش در {stopped_count} گروه متوقف شد!</b>\n\n"
-            "◄ تمام اکانت‌ها از گروه‌ها خارج شدند.",
+            "◄ تمام اکانت‌ها از ویس چت خارج شدند.",
             parse_mode='HTML'
         )
     except Exception as e:
@@ -549,7 +553,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
-    # ========== پخش در ویس چت گروه با py-tgcalls ==========
+    # ========== پخش در ویس چت گروه ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
@@ -605,18 +609,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await app.connect()
                 print(f"✅ اکانت {acc.get('phone')} متصل شد")
                 
-                # ===== جوین شدن در گروه =====
+                # ===== جوین شدن در گروه با روش پیشرفته =====
                 try:
+                    # روش ۱: جوین با لینک کامل
                     chat = await app.join_chat(link)
                     chat_id = chat.id
                     print(f"✅ جوین شد با لینک: {chat_id}")
                 except Exception as e1:
                     print(f"⚠️ خطا در جوین با لینک: {e1}")
                     try:
-                        chat = await app.get_chat(link)
-                        chat_id = chat.id
-                        await app.join_chat(chat_id)
-                        print(f"✅ جوین شد با آیدی: {chat_id}")
+                        # روش ۲: استخراج کد دعوت از لینک
+                        if 'joinchat/' in link:
+                            invite_code = link.split('joinchat/')[-1]
+                        elif '+' in link:
+                            invite_code = link.split('+')[-1]
+                        else:
+                            invite_code = link.replace('https://t.me/', '').replace('@', '')
+                        
+                        if invite_code and not invite_code.startswith('+'):
+                            chat = await app.join_chat(invite_code)
+                            chat_id = chat.id
+                        else:
+                            chat = await app.get_chat(link)
+                            chat_id = chat.id
+                            await app.join_chat(chat_id)
+                        print(f"✅ جوین شد با روش جایگزین: {chat_id}")
                     except Exception as e2:
                         print(f"❌ خطا در جوین: {e2}")
                         error_details.append(f"اکانت {acc.get('phone')}: جوین نشد - {e2}")
@@ -624,11 +641,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await app.disconnect()
                         continue
                 
-                # ===== تلاش برای پخش در ویس چت با py-tgcalls =====
+                # ===== پخش در ویس چت با pytgcalls =====
                 try:
-                    from py_tgcalls import PyTgCalls
-                    from py_tgcalls.types import AudioQuality
-                    from py_tgcalls.types.input_stream import AudioStream, InputAudioStream
+                    from pytgcalls import PyTgCalls
+                    from pytgcalls.types import AudioQuality
+                    from pytgcalls.types.input_stream import AudioStream, InputAudioStream
                     
                     call = PyTgCalls(app)
                     await call.start()
@@ -645,11 +662,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
                     print(f"✅ MP3 پخش شد در اکانت {acc.get('phone')}")
                     
+                    if acc['id'] not in active_calls:
+                        active_calls[acc['id']] = []
+                    active_calls[acc['id']].append({
+                        'chat_id': chat_id,
+                        'call': call,
+                        'app': app
+                    })
+                    
                     success_count += 1
                     
-                except ImportError:
-                    # اگر py-tgcalls نصب نبود، فقط ارسال فایل
-                    print("⚠️ py-tgcalls نصب نیست، فقط فایل ارسال میشه")
+                except ImportError as e:
+                    print(f"⚠️ pytgcalls نصب نیست: {e}")
+                    # اگر pytgcalls نصب نبود، فایل رو ارسال کن
                     try:
                         if is_mp3:
                             await app.send_audio(chat_id, media_file['file_id'])
@@ -659,13 +684,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     except Exception as e3:
                         error_details.append(f"اکانت {acc.get('phone')}: ارسال نشد - {e3}")
                         fail_count += 1
-                
+                    
                 except Exception as e3:
                     print(f"❌ خطا در پخش: {e3}")
                     error_details.append(f"اکانت {acc.get('phone')}: پخش نشد - {e3}")
                     fail_count += 1
-                
-                await app.disconnect()
+                    await app.disconnect()
                 
             except Exception as e:
                 print(f"❌ خطای کلی: {e}")
