@@ -311,7 +311,7 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """متوقف کردن پخش در همه گروه‌ها"""
     try:
         from pyrogram import Client
-        from pytgcalls import PyTgCalls
+        from py_tgcalls import PyTgCalls
         
         stopped_count = 0
         for acc in accounts:
@@ -553,7 +553,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
-    # ========== پخش در ویس چت گروه ==========
+    # ========== پخش در ویس چت گروه با py-tgcalls ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
@@ -597,9 +597,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
-                from pytgcalls import PyTgCalls
-                from pytgcalls.types import AudioQuality
-                from pytgcalls.types.input_stream import AudioStream, InputAudioStream
+                from py_tgcalls import PyTgCalls
+                from py_tgcalls.types import AudioQuality
+                from py_tgcalls.types.input_stream import AudioStream, InputAudioStream
                 
                 print(f"🔄 شروع با اکانت: {acc.get('phone')}")
                 
