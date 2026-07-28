@@ -20,7 +20,7 @@ user_sessions = {}
 accounts = []
 mp3_files = []
 mp4_files = []
-active_calls = {}  # ذخیره تماس‌های فعال
+active_calls = {}
 
 DATA_FILE = "data.json"
 
@@ -327,7 +327,6 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 call = PyTgCalls(app)
                 await call.start()
                 
-                # خروج از همه تماس‌ها
                 async for dialog in app.get_dialogs():
                     if dialog.chat.type in ["group", "supergroup"]:
                         try:
@@ -377,7 +376,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_sessions[user_id]['client'] = app
             user_sessions[user_id]['phone_code_hash'] = sent_code.phone_code_hash
             
-            # ذخیره زمان ارسال کد
             user_sessions[user_id]['code_sent_time'] = time.time()
             
             await update.message.reply_text(
@@ -415,9 +413,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ کد باید ۵ رقم باشد!")
             return
         
-        # بررسی زمان ارسال کد (۵ دقیقه)
         code_sent_time = user_sessions[user_id].get('code_sent_time', 0)
-        if time.time() - code_sent_time > 300:  # ۵ دقیقه
+        if time.time() - code_sent_time > 300:
             await update.message.reply_text(
                 "❌ <b>کد منقضی شده!</b>\n\n"
                 "◄ زمان ۵ دقیقه تمام شده.\n"
@@ -556,7 +553,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
-    # ========== پخش در ویس چت گروه (با pytgcalls) ==========
+    # ========== پخش در ویس چت گروه ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
@@ -602,7 +599,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 from pyrogram import Client
                 from pytgcalls import PyTgCalls
                 from pytgcalls.types import AudioQuality, VideoQuality
-                from pytgcalls.types.input_stream import AudioStream, VideoStream, InputAudioStream, InputVideoStream
+                from pytgcalls.types.stream import AudioStream, VideoStream, InputAudioStream, InputVideoStream
                 
                 print(f"🔄 شروع با اکانت: {acc.get('phone')}")
                 
@@ -663,7 +660,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         )
                         print(f"✅ MP4 پخش شد در اکانت {acc.get('phone')}")
                     
-                    # ذخیره تماس برای توقف بعدی
                     if acc['id'] not in active_calls:
                         active_calls[acc['id']] = []
                     active_calls[acc['id']].append({
@@ -685,7 +681,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 error_details.append(f"اکانت {acc.get('phone')}: {e}")
                 fail_count += 1
         
-        # ===== گزارش نهایی =====
         result_text = f"✅ <b>عملیات پخش در ویس چت کامل شد!</b>\n\n"
         result_text += f"🔗 <b>لینک:</b> {link}\n"
         result_text += f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
