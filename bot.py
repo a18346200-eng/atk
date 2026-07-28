@@ -311,7 +311,6 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """متوقف کردن پخش در همه گروه‌ها"""
     try:
         from pyrogram import Client
-        from pytgcalls import PyTgCalls
         
         stopped_count = 0
         for acc in accounts:
@@ -324,25 +323,22 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
                 await app.connect()
                 
-                call = PyTgCalls(app)
-                await call.start()
-                
+                # فقط از گروه‌ها خارج میشیم
                 async for dialog in app.get_dialogs():
                     if dialog.chat.type in ["group", "supergroup"]:
                         try:
-                            await call.leave_group_call(dialog.chat.id)
+                            await app.leave_chat(dialog.chat.id)
                             stopped_count += 1
                         except:
                             pass
                 
-                await call.stop()
                 await app.disconnect()
             except:
                 pass
         
         await update.message.reply_text(
             f"✅ <b>پخش در {stopped_count} گروه متوقف شد!</b>\n\n"
-            "◄ تمام اکانت‌ها از ویس چت خارج شدند.",
+            "◄ تمام اکانت‌ها از گروه‌ها خارج شدند.",
             parse_mode='HTML'
         )
     except Exception as e:
@@ -553,7 +549,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
-    # ========== پخش در ویس چت گروه ==========
+    # ========== پخش در ویس چت گروه با py-tgcalls ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
@@ -597,9 +593,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
-                from pytgcalls import PyTgCalls
-                from pytgcalls.types import AudioQuality, VideoQuality
-                from pytgcalls.types.stream import AudioStream, VideoStream, InputAudioStream, InputVideoStream
                 
                 print(f"🔄 شروع با اکانت: {acc.get('phone')}")
                 
@@ -631,50 +624,48 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await app.disconnect()
                         continue
                 
-                # ===== پخش در ویس چت =====
+                # ===== تلاش برای پخش در ویس چت با py-tgcalls =====
                 try:
+                    from py_tgcalls import PyTgCalls
+                    from py_tgcalls.types import AudioQuality
+                    from py_tgcalls.types.input_stream import AudioStream, InputAudioStream
+                    
                     call = PyTgCalls(app)
                     await call.start()
                     print(f"✅ تماس شروع شد برای اکانت {acc.get('phone')}")
                     
-                    if is_mp3:
-                        await call.join_group_call(
-                            chat_id,
-                            AudioStream(
-                                InputAudioStream(
-                                    media_path,
-                                    audio_parameters=AudioQuality.HIGH
-                                )
+                    await call.join_group_call(
+                        chat_id,
+                        AudioStream(
+                            InputAudioStream(
+                                media_path,
+                                audio_parameters=AudioQuality.HIGH
                             )
                         )
-                        print(f"✅ MP3 پخش شد در اکانت {acc.get('phone')}")
-                    else:
-                        await call.join_group_call(
-                            chat_id,
-                            VideoStream(
-                                InputVideoStream(
-                                    media_path,
-                                    video_parameters=VideoQuality.HIGH
-                                )
-                            )
-                        )
-                        print(f"✅ MP4 پخش شد در اکانت {acc.get('phone')}")
-                    
-                    if acc['id'] not in active_calls:
-                        active_calls[acc['id']] = []
-                    active_calls[acc['id']].append({
-                        'chat_id': chat_id,
-                        'call': call,
-                        'app': app
-                    })
+                    )
+                    print(f"✅ MP3 پخش شد در اکانت {acc.get('phone')}")
                     
                     success_count += 1
                     
+                except ImportError:
+                    # اگر py-tgcalls نصب نبود، فقط ارسال فایل
+                    print("⚠️ py-tgcalls نصب نیست، فقط فایل ارسال میشه")
+                    try:
+                        if is_mp3:
+                            await app.send_audio(chat_id, media_file['file_id'])
+                        else:
+                            await app.send_video(chat_id, media_file['file_id'])
+                        success_count += 1
+                    except Exception as e3:
+                        error_details.append(f"اکانت {acc.get('phone')}: ارسال نشد - {e3}")
+                        fail_count += 1
+                
                 except Exception as e3:
                     print(f"❌ خطا در پخش: {e3}")
                     error_details.append(f"اکانت {acc.get('phone')}: پخش نشد - {e3}")
                     fail_count += 1
-                    await app.disconnect()
+                
+                await app.disconnect()
                 
             except Exception as e:
                 print(f"❌ خطای کلی: {e}")
