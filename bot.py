@@ -611,14 +611,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # ===== جوین شدن در گروه با روش پیشرفته =====
                 try:
-                    # روش ۱: جوین با لینک کامل
                     chat = await app.join_chat(link)
                     chat_id = chat.id
                     print(f"✅ جوین شد با لینک: {chat_id}")
                 except Exception as e1:
                     print(f"⚠️ خطا در جوین با لینک: {e1}")
                     try:
-                        # روش ۲: استخراج کد دعوت از لینک
                         if 'joinchat/' in link:
                             invite_code = link.split('joinchat/')[-1]
                         elif '+' in link:
@@ -674,7 +672,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     
                 except ImportError as e:
                     print(f"⚠️ pytgcalls نصب نیست: {e}")
-                    # اگر pytgcalls نصب نبود، فایل رو ارسال کن
                     try:
                         if is_mp3:
                             await app.send_audio(chat_id, media_file['file_id'])
