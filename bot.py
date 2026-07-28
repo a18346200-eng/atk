@@ -10,14 +10,15 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+# توکن جدید
 TOKEN = "8576876988:AAGBLHEz9IAQa9NwgG6L8tWZnUQjUifxu10"
 OWNER_ID = 7803165903
-API_ID = 37160656
-API_HASH = "c75ef3eadae1ffb6cad9d6736d0e2323"
+
+# ✅ API_ID و API_HASH جدید
+API_ID = 29811798
+API_HASH = "ef5847a43a978d6883b97b0caeb81736"
 
 user_sessions = {}
-
-print("🔄 در حال راه‌اندازی...")
 
 OWNER_START_TEXT = """
 🌟 <b>سازنده ربات عزیز به ربات ZX خوش آمدید!</b> 🌹
@@ -61,21 +62,36 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if query.data == 'add_account':
         user_sessions[user_id] = {'step': 'phone'}
+        
+        # استفاده از API_ID و API_HASH جدید به صورت پیش‌فرض
+        user_sessions[user_id]['api_id'] = API_ID
+        user_sessions[user_id]['api_hash'] = API_HASH
+        
         await query.edit_message_text(
-            "📱 شماره تلفن خود را ارسال کنید:\nمثال: +989123456789\n\nبرای لغو: /cancel",
+            "📱 <b>مرحله ۱: وارد کردن شماره تلفن</b>\n\n"
+            "◄ لطفاً <b>شماره تلفن</b> اکانت تلگرام خود را وارد کنید.\n"
+            "◂ مثال: <code>+989123456789</code>\n\n"
+            "💡 <b>نکته:</b> از API_ID و API_HASH جدید استفاده میشه:\n"
+            f"🔑 API_ID: <code>{API_ID}</code>\n"
+            f"🔑 API_HASH: <code>{API_HASH}</code>\n\n"
+            "⫸ برای لغو: /cancel",
             parse_mode='HTML'
         )
     elif query.data == 'settings':
         keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]]
         await query.edit_message_text(
-            "⚙️ تنظیمات در حال توسعه...",
+            "⚙️ <b>تنظیمات ربات</b>\n\n"
+            f"🔑 API_ID: <code>{API_ID}</code>\n"
+            f"🔑 API_HASH: <code>{API_HASH}</code>\n\n"
+            "📍 در حال توسعه...",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     elif query.data == 'attack':
         keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]]
         await query.edit_message_text(
-            "💥 بخش حمله در حال توسعه...",
+            "💥 <b>بخش حمله</b>\n\n"
+            "📍 در حال توسعه...",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -96,32 +112,72 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id != OWNER_ID or user_id not in user_sessions:
         return
     
-    text = update.message.text
+    text = update.message.text.strip()
     step = user_sessions[user_id]['step']
     
+    # مرحله ۱: دریافت شماره تلفن
     if step == 'phone':
         if not text.startswith('+') or not text[1:].isdigit():
-            await update.message.reply_text("❌ فرمت شماره نامعتبر! مثال: +989123456789")
+            await update.message.reply_text(
+                "❌ فرمت شماره نامعتبر! مثال: +989123456789\n\n"
+                "◄ لطفاً شماره را با کد کشور وارد کنید.",
+                parse_mode='HTML'
+            )
             return
         
         user_sessions[user_id]['phone'] = text
         user_sessions[user_id]['step'] = 'code'
         
+        # ارسال کد تایید با API جدید
         try:
             from pyrogram import Client
-            app = Client(f"session_{user_id}", api_id=API_ID, api_hash=API_HASH, phone_number=text)
+            
+            api_id = user_sessions[user_id]['api_id']
+            api_hash = user_sessions[user_id]['api_hash']
+            
+            app = Client(
+                f"session_{user_id}",
+                api_id=api_id,
+                api_hash=api_hash,
+                phone_number=text
+            )
+            
             await app.connect()
             sent_code = await app.send_code(text)
+            
             user_sessions[user_id]['client'] = app
             user_sessions[user_id]['phone_code_hash'] = sent_code.phone_code_hash
-            await update.message.reply_text(f"📨 کد تایید به {text} ارسال شد. کد ۵ رقمی را وارد کنید.")
+            
+            await update.message.reply_text(
+                f"📨 <b>کد تایید ارسال شد!</b>\n\n"
+                f"◄ کد ۵ رقمی به شماره <code>{text}</code> ارسال شد.\n"
+                f"◂ لطفاً کد دریافتی را وارد کنید.\n\n"
+                f"⫸ برای لغو: /cancel",
+                parse_mode='HTML'
+            )
+            
         except Exception as e:
-            await update.message.reply_text(f"❌ خطا: {str(e)}")
-            del user_sessions[user_id]
+            error_msg = str(e)
+            await update.message.reply_text(
+                f"❌ <b>خطا در ارسال کد!</b>\n\n"
+                f"◄ خطا: <code>{error_msg}</code>\n\n"
+                "◂ لطفاً اطلاعات زیر رو بررسی کن:\n"
+                f"🔑 API_ID: <code>{user_sessions[user_id]['api_id']}</code>\n"
+                f"🔑 API_HASH: <code>{user_sessions[user_id]['api_hash']}</code>\n\n"
+                "◄ مطمئن شوید API_ID و API_HASH درست هستن.\n"
+                "⫸ برای شروع مجدد /start را بزنید.",
+                parse_mode='HTML'
+            )
+            if user_id in user_sessions:
+                del user_sessions[user_id]
     
+    # مرحله ۲: دریافت کد تایید
     elif step == 'code':
         if not text.isdigit() or len(text) != 5:
-            await update.message.reply_text("❌ کد باید ۵ رقم باشد!")
+            await update.message.reply_text(
+                "❌ کد باید ۵ رقم باشد! دوباره وارد کنید:",
+                parse_mode='HTML'
+            )
             return
         
         try:
@@ -129,21 +185,45 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phone_code_hash = user_sessions[user_id]['phone_code_hash']
             app = user_sessions[user_id]['client']
             
-            await app.sign_in(phone_number=phone, phone_code_hash=phone_code_hash, phone_code=text)
+            # تایید کد
+            await app.sign_in(
+                phone_number=phone,
+                phone_code_hash=phone_code_hash,
+                phone_code=text
+            )
+            
+            # ساخت سشن
             session_string = await app.export_session_string()
             
+            # ذخیره سشن در فایل
             with open(f"session_{phone}.txt", "w") as f:
                 f.write(session_string)
             
             await update.message.reply_text(
-                f"✅ سشن ساخته شد!\n\n📱 شماره: {phone}\n\n🔑 سشن:\n<code>{session_string}</code>",
+                f"✅ <b>سشن با موفقیت ساخته شد!</b>\n\n"
+                f"📱 <b>شماره:</b> <code>{phone}</code>\n\n"
+                f"🔑 <b>سشن استرینگ:</b>\n"
+                f"<code>{session_string}</code>\n\n"
+                f"◄ سشن در فایل <code>session_{phone}.txt</code> ذخیره شد.\n\n"
+                f"⫸ برای بازگشت به منوی اصلی /start را بزنید.",
                 parse_mode='HTML'
             )
             
             await app.disconnect()
-            del user_sessions[user_id]
+            
+            if user_id in user_sessions:
+                del user_sessions[user_id]
+            
         except Exception as e:
-            await update.message.reply_text(f"❌ خطا در ساخت سشن: {str(e)}")
+            error_msg = str(e)
+            await update.message.reply_text(
+                f"❌ <b>خطا در ساخت سشن!</b>\n\n"
+                f"◄ خطا: <code>{error_msg}</code>\n\n"
+                "◂ لطفاً کد وارد شده را بررسی کنید.\n"
+                "⫸ برای شروع مجدد /start را بزنید.",
+                parse_mode='HTML'
+            )
+            
             if user_id in user_sessions:
                 if 'client' in user_sessions[user_id]:
                     try:
@@ -161,13 +241,22 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
         del user_sessions[user_id]
-        await update.message.reply_text("❌ عملیات لغو شد!")
+        await update.message.reply_text(
+            "❌ <b>عملیات لغو شد!</b>\n\n"
+            "◄ برای شروع مجدد /start را بزنید.",
+            parse_mode='HTML'
+        )
     else:
-        await update.message.reply_text("ℹ️ هیچ عملیاتی وجود ندارد!")
+        await update.message.reply_text(
+            "ℹ️ <b>هیچ عملیاتی وجود ندارد!</b>",
+            parse_mode='HTML'
+        )
 
 if __name__ == '__main__':
     try:
         print("🚀 ربات در حال راه‌اندازی...")
+        print(f"🔑 API_ID: {API_ID}")
+        print(f"🔑 API_HASH: {API_HASH}")
         
         application = Application.builder().token(TOKEN).build()
         
