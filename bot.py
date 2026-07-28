@@ -597,6 +597,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
+                from pytgcalls import PyTgCalls
+                from pytgcalls.types import AudioQuality
+                from pytgcalls.types.input_stream import AudioStream, InputAudioStream
                 
                 print(f"🔄 شروع با اکانت: {acc.get('phone')}")
                 
@@ -609,7 +612,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await app.connect()
                 print(f"✅ اکانت {acc.get('phone')} متصل شد")
                 
-                # ===== جوین شدن در گروه با روش پیشرفته =====
+                # ===== جوین شدن در گروه =====
                 try:
                     chat = await app.join_chat(link)
                     chat_id = chat.id
@@ -639,12 +642,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await app.disconnect()
                         continue
                 
-                # ===== پخش در ویس چت با pytgcalls =====
+                # ===== پخش در ویس چت =====
                 try:
-                    from pytgcalls import PyTgCalls
-                    from pytgcalls.types import AudioQuality
-                    from pytgcalls.types.input_stream import AudioStream, InputAudioStream
-                    
                     call = PyTgCalls(app)
                     await call.start()
                     print(f"✅ تماس شروع شد برای اکانت {acc.get('phone')}")
@@ -669,18 +668,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     })
                     
                     success_count += 1
-                    
-                except ImportError as e:
-                    print(f"⚠️ pytgcalls نصب نیست: {e}")
-                    try:
-                        if is_mp3:
-                            await app.send_audio(chat_id, media_file['file_id'])
-                        else:
-                            await app.send_video(chat_id, media_file['file_id'])
-                        success_count += 1
-                    except Exception as e3:
-                        error_details.append(f"اکانت {acc.get('phone')}: ارسال نشد - {e3}")
-                        fail_count += 1
                     
                 except Exception as e3:
                     print(f"❌ خطا در پخش: {e3}")
