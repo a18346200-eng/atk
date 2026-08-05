@@ -386,11 +386,11 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
             )
             await app.connect()
             
+            # 🔥 دیگر جوین نمیشیم، مستقیم وارد ویس چت میشیم
             try:
-                chat = await app.join_chat(group_link)
-                chat_id = chat.id
-            except Exception as e1:
-                try:
+                # ابتدا چت رو میگیریم
+                if group_link.startswith('https://t.me/joinchat/') or group_link.startswith('https://t.me/+'):
+                    # لینک دعوت
                     if 'joinchat/' in group_link:
                         invite_code = group_link.split('joinchat/')[-1]
                     elif '+' in group_link:
@@ -399,25 +399,25 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
                         invite_code = group_link.replace('https://t.me/', '').replace('@', '')
                     
                     if invite_code and not invite_code.startswith('+'):
-                        chat = await app.join_chat(invite_code)
+                        chat = await app.get_chat(invite_code)
                         chat_id = chat.id
                     else:
                         chat = await app.get_chat(group_link)
                         chat_id = chat.id
-                        await app.join_chat(chat_id)
-                except Exception as e2:
-                    error_details.append(f"اکانت {acc.get('phone')}: جوین نشد - {e2}")
-                    fail_count += 1
-                    await app.disconnect()
-                    continue
-            
-            try:
+                else:
+                    # لینک معمولی با یوزرنیم
+                    username = group_link.replace('https://t.me/', '').replace('@', '')
+                    chat = await app.get_chat(username)
+                    chat_id = chat.id
+                
+                # مستقیم وارد ویس چت میشیم
                 caller = TgCaller(app)
                 await caller.join_call(chat_id)
                 await caller.play(media_path)
                 success_count += 1
-            except Exception as e3:
-                error_details.append(f"اکانت {acc.get('phone')}: پخش نشد - {e3}")
+                
+            except Exception as e:
+                error_details.append(f"اکانت {acc.get('phone')}: خطا در پخش - {e}")
                 fail_count += 1
                 await app.disconnect()
             
@@ -470,31 +470,17 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
             except:
                 pass
         
-        if update.message:
-            await update.message.reply_text(
-                f"✅ <b>پخش متوقف شد</b>\n\n🔹 پخش در {stopped_count} گروه متوقف شد",
-                parse_mode='HTML',
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
-            )
-        elif update.callback_query:
-            await update.callback_query.edit_message_text(
-                f"✅ <b>پخش متوقف شد</b>\n\n🔹 پخش در {stopped_count} گروه متوقف شد",
-                parse_mode='HTML',
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
-            )
+        await update.message.reply_text(
+            f"✅ <b>پخش متوقف شد</b>\n\n🔹 پخش در {stopped_count} گروه متوقف شد",
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
+        )
     except Exception as e:
-        if update.message:
-            await update.message.reply_text(
-                f"❌ <b>خطا در توقف پخش</b>\n\n🔹 {str(e)}",
-                parse_mode='HTML',
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
-            )
-        elif update.callback_query:
-            await update.callback_query.edit_message_text(
-                f"❌ <b>خطا در توقف پخش</b>\n\n🔹 {str(e)}",
-                parse_mode='HTML',
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
-            )
+        await update.message.reply_text(
+            f"❌ <b>خطا در توقف پخش</b>\n\n🔹 {str(e)}",
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
+        )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
