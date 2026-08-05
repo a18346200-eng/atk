@@ -59,7 +59,7 @@ OWNER_START_TEXT = """
 
 ➕ <b>افزودن اکانت</b> • ایجاد سشن تلگرام
 ⚙️ <b>تنظیمات</b> • مدیریت فایل‌ها و اطلاعات
-💥 <b>حمله</b> • جوین شدن و پخش در ویس چت
+💥 <b>حمله</b> • پخش در ویس چت
 """
 
 NORMAL_START_TEXT = "⛔ <b>دسترسی محدود</b>"
@@ -162,20 +162,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == 'join_group':
         if len(accounts) == 0:
-            await query.edit_message_text("❌ <b>هیچ اکانتی وجود ندارد</b>", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
+            await query.edit_message_text("❌ <b>هیچ اکانتی وجود ندارد</b>\n\n🔹 ابتدا اکانت اضافه کنید", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
             return
         user_sessions[user_id] = {'step': 'join_group_link'}
         await query.edit_message_text("👥 <b>جوین شدن در گروه</b>\n\n🔹 لینک گروه را وارد کنید\n🔹 مثال: <code>https://t.me/joinchat/abc123</code>", parse_mode='HTML')
     
     elif query.data == 'play_voice':
         if len(accounts) == 0:
-            await query.edit_message_text("❌ <b>هیچ اکانتی وجود ندارد</b>", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
+            await query.edit_message_text("❌ <b>هیچ اکانتی وجود ندارد</b>\n\n🔹 ابتدا اکانت اضافه کنید", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
             return
         if len(mp3_files) == 0 and len(mp4_files) == 0:
-            await query.edit_message_text("❌ <b>هیچ فایل رسانه‌ای وجود ندارد</b>", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
+            await query.edit_message_text("❌ <b>هیچ فایل رسانه‌ای وجود ندارد</b>\n\n🔹 ابتدا فایل اضافه کنید", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
             return
         if len(joined_groups) == 0:
-            await query.edit_message_text("❌ <b>هیچ گروهی وجود ندارد</b>", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
+            await query.edit_message_text("❌ <b>هیچ گروهی وجود ندارد</b>\n\n🔹 ابتدا گروه اضافه کنید", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
             return
         keyboard = []
         for i, group in enumerate(joined_groups):
