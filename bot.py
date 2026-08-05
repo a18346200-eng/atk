@@ -20,6 +20,7 @@ user_sessions = {}
 accounts = []
 mp3_files = []
 mp4_files = []
+active_calls = {}
 
 DATA_FILE = "data.json"
 
@@ -202,15 +203,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == 'attack':
         keyboard = [
-            [InlineKeyboardButton("👥 ورود به ویس چت گروه", callback_data='attack_group')],
-            [InlineKeyboardButton("⏹️ خروج از ویس چت", callback_data='stop_playback')],
+            [InlineKeyboardButton("👥 پخش در ویس چت گروه", callback_data='attack_group')],
+            [InlineKeyboardButton("⏹️ توقف پخش", callback_data='stop_playback')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
         ]
         await query.edit_message_text(
-            "💥 <b>بخش ویس چت</b>\n\n"
+            "💥 <b>بخش پخش در ویس چت</b>\n\n"
             "◄ لطفاً عملیات مورد نظر رو انتخاب کنید:\n\n"
-            "🔹 <b>ورود به ویس چت:</b> جوین شده و در ویس چت پخش میکنه\n"
-            "🔹 <b>خروج از ویس چت:</b> خارج شدن از ویس چت\n\n"
+            "🔹 <b>پخش در ویس چت:</b> جوین شده و در ویس چت پخش میکنه\n"
+            "🔹 <b>توقف پخش:</b> متوقف کردن پخش در همه گروه‌ها\n\n"
             f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n"
             f"🎵 <b>MP3:</b> {len(mp3_files)} | 🎬 <b>MP4:</b> {len(mp4_files)}",
             parse_mode='HTML',
@@ -286,7 +287,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == 'stop_playback':
         await query.edit_message_text(
-            "⏹️ <b>در حال خروج از ویس چت...</b>\n\n"
+            "⏹️ <b>در حال توقف پخش...</b>\n\n"
             "◄ لطفاً صبر کنید...",
             parse_mode='HTML'
         )
@@ -307,10 +308,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """خروج از ویس چت همه گروه‌ها"""
+    """متوقف کردن پخش در همه گروه‌ها"""
     try:
         from pyrogram import Client
-        from pytgcalls import PyTgCalls
+        from py_tgcalls import PyTgCalls
         
         stopped_count = 0
         for acc in accounts:
@@ -340,11 +341,12 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 pass
         
         await update.message.reply_text(
-            f"✅ <b>خروج از {stopped_count} ویس چت انجام شد!</b>",
+            f"✅ <b>پخش در {stopped_count} گروه متوقف شد!</b>\n\n"
+            "◄ تمام اکانت‌ها از ویس چت خارج شدند.",
             parse_mode='HTML'
         )
     except Exception as e:
-        await update.message.reply_text(f"❌ خطا: {str(e)}")
+        await update.message.reply_text(f"❌ خطا در توقف پخش: {str(e)}")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -551,7 +553,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
-    # ========== ورود به ویس چت و پخش ==========
+    # ========== پخش در ویس چت گروه ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
@@ -580,7 +582,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         await update.message.reply_text(
-            f"🔄 <b>در حال ورود به ویس چت گروه...</b>\n\n"
+            f"🔄 <b>در حال پخش در ویس چت گروه...</b>\n\n"
             f"🔗 لینک: {link}\n"
             f"🎵 رسانه: {media_file.get('name', 'Unknown')}\n"
             f"📊 تعداد اکانت‌ها: {len(accounts)}\n\n"
@@ -595,9 +597,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
-                from pytgcalls import PyTgCalls
-                from pytgcalls.types import AudioQuality
-                from pytgcalls.types.input_stream import AudioStream, InputAudioStream
+                from py_tgcalls import PyTgCalls
+                from py_tgcalls.types import AudioQuality, VideoQuality
+                from py_tgcalls.types.input_stream import AudioStream, VideoStream, InputAudioStream, InputVideoStream
                 
                 print(f"🔄 شروع با اکانت: {acc.get('phone')}")
                 
@@ -640,22 +642,42 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await app.disconnect()
                         continue
                 
-                # ===== ورود به ویس چت و پخش =====
+                # ===== پخش در ویس چت =====
                 try:
                     call = PyTgCalls(app)
                     await call.start()
                     print(f"✅ تماس شروع شد برای اکانت {acc.get('phone')}")
                     
-                    await call.join_group_call(
-                        chat_id,
-                        AudioStream(
-                            InputAudioStream(
-                                media_path,
-                                audio_parameters=AudioQuality.HIGH
+                    if is_mp3:
+                        await call.join_group_call(
+                            chat_id,
+                            AudioStream(
+                                InputAudioStream(
+                                    media_path,
+                                    audio_parameters=AudioQuality.HIGH
+                                )
                             )
                         )
-                    )
-                    print(f"✅ در ویس چت پخش شد در اکانت {acc.get('phone')}")
+                        print(f"✅ MP3 پخش شد در اکانت {acc.get('phone')}")
+                    else:
+                        await call.join_group_call(
+                            chat_id,
+                            VideoStream(
+                                InputVideoStream(
+                                    media_path,
+                                    video_parameters=VideoQuality.HIGH
+                                )
+                            )
+                        )
+                        print(f"✅ MP4 پخش شد در اکانت {acc.get('phone')}")
+                    
+                    if acc['id'] not in active_calls:
+                        active_calls[acc['id']] = []
+                    active_calls[acc['id']].append({
+                        'chat_id': chat_id,
+                        'call': call,
+                        'app': app
+                    })
                     
                     success_count += 1
                     
@@ -670,7 +692,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 error_details.append(f"اکانت {acc.get('phone')}: {e}")
                 fail_count += 1
         
-        result_text = f"✅ <b>عملیات ورود به ویس چت کامل شد!</b>\n\n"
+        result_text = f"✅ <b>عملیات پخش در ویس چت کامل شد!</b>\n\n"
         result_text += f"🔗 <b>لینک:</b> {link}\n"
         result_text += f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
         result_text += f"✅ <b>موفق:</b> {success_count} اکانت\n"
