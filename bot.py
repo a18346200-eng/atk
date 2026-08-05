@@ -55,7 +55,7 @@ OWNER_START_TEXT = """
 
 🔹 <b>افزودن اکانت:</b> برای ساخت سشن تلگرام
 🔹 <b>تنظیمات:</b> مدیریت فایل‌های MP3 و MP4
-🔹 <b>حمله:</b> برای جوین شدن در گروه و ارسال فایل
+🔹 <b>حمله:</b> برای جوین شدن در گروه و پخش در ویس چت
 
 ⚡ <b>وضعیت ربات:</b> فعال ✅
 """
@@ -182,7 +182,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             "🎵 <b>افزودن MP3</b>\n\n"
             "◄ لطفاً فایل <b>MP3</b> خود را ارسال کنید.\n"
-            "◂ ربات فایل را کامل ذخیره کرده و برای ارسال استفاده خواهد کرد.\n\n"
+            "◂ ربات فایل را کامل ذخیره کرده و برای پخش استفاده خواهد کرد.\n\n"
             "⫸ برای لغو: /cancel",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -194,7 +194,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             "🎬 <b>افزودن MP4</b>\n\n"
             "◄ لطفاً فایل <b>MP4</b> خود را ارسال کنید.\n"
-            "◂ ربات فایل را کامل ذخیره کرده و برای ارسال استفاده خواهد کرد.\n\n"
+            "◂ ربات فایل را کامل ذخیره کرده و برای پخش استفاده خواهد کرد.\n\n"
             "⫸ برای لغو: /cancel",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -202,13 +202,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == 'attack':
         keyboard = [
-            [InlineKeyboardButton("👥 ارسال به گروه", callback_data='attack_group')],
+            [InlineKeyboardButton("👥 ورود به ویس چت گروه", callback_data='attack_group')],
+            [InlineKeyboardButton("⏹️ خروج از ویس چت", callback_data='stop_playback')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
         ]
         await query.edit_message_text(
-            "💥 <b>بخش حمله</b>\n\n"
+            "💥 <b>بخش ویس چت</b>\n\n"
             "◄ لطفاً عملیات مورد نظر رو انتخاب کنید:\n\n"
-            "🔹 <b>ارسال به گروه:</b> جوین شده و فایل رو ارسال میکنه\n\n"
+            "🔹 <b>ورود به ویس چت:</b> جوین شده و در ویس چت پخش میکنه\n"
+            "🔹 <b>خروج از ویس چت:</b> خارج شدن از ویس چت\n\n"
             f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n"
             f"🎵 <b>MP3:</b> {len(mp3_files)} | 🎬 <b>MP4:</b> {len(mp4_files)}",
             parse_mode='HTML',
@@ -243,7 +245,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         user_sessions[user_id] = {'step': 'attack_group_select'}
         await query.edit_message_text(
-            "🎵 <b>انتخاب رسانه</b>\n\n"
+            "🎵 <b>انتخاب رسانه برای پخش در ویس چت</b>\n\n"
             "◄ لطفاً یکی از رسانه‌های زیر رو انتخاب کنید:\n\n"
             f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}",
             parse_mode='HTML',
@@ -261,6 +263,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "◄ لطفاً <b>لینک گروه</b> را وارد کنید.\n"
                 "◂ مثال: <code>https://t.me/joinchat/abc123</code>\n"
                 "◂ یا: <code>https://t.me/groupusername</code>\n\n"
+                "⚠️ <b>توجه:</b> گروه باید ویس چت فعال داشته باشه!\n\n"
                 "⫸ برای لغو: /cancel",
                 parse_mode='HTML'
             )
@@ -276,9 +279,19 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "◄ لطفاً <b>لینک گروه</b> را وارد کنید.\n"
                 "◂ مثال: <code>https://t.me/joinchat/abc123</code>\n"
                 "◂ یا: <code>https://t.me/groupusername</code>\n\n"
+                "⚠️ <b>توجه:</b> گروه باید ویس چت فعال داشته باشه!\n\n"
                 "⫸ برای لغو: /cancel",
                 parse_mode='HTML'
             )
+    
+    elif query.data == 'stop_playback':
+        await query.edit_message_text(
+            "⏹️ <b>در حال خروج از ویس چت...</b>\n\n"
+            "◄ لطفاً صبر کنید...",
+            parse_mode='HTML'
+        )
+        
+        await stop_all_playbacks(update, context)
     
     elif query.data == 'back_to_menu':
         keyboard = [
@@ -292,6 +305,46 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+
+async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """خروج از ویس چت همه گروه‌ها"""
+    try:
+        from pyrogram import Client
+        from pytgcalls import PyTgCalls
+        
+        stopped_count = 0
+        for acc in accounts:
+            try:
+                app = Client(
+                    f"stop_session_{acc['id']}",
+                    api_id=API_ID,
+                    api_hash=API_HASH,
+                    session_string=acc['session']
+                )
+                await app.connect()
+                
+                call = PyTgCalls(app)
+                await call.start()
+                
+                async for dialog in app.get_dialogs():
+                    if dialog.chat.type in ["group", "supergroup"]:
+                        try:
+                            await call.leave_group_call(dialog.chat.id)
+                            stopped_count += 1
+                        except:
+                            pass
+                
+                await call.stop()
+                await app.disconnect()
+            except:
+                pass
+        
+        await update.message.reply_text(
+            f"✅ <b>خروج از {stopped_count} ویس چت انجام شد!</b>",
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا: {str(e)}")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -498,7 +551,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
-    # ========== ارسال فایل به گروه ==========
+    # ========== ورود به ویس چت و پخش ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
         link = update.message.text.strip()
         
@@ -514,9 +567,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         media_file = mp3_files[media_index] if is_mp3 else mp4_files[media_index]
+        media_path = media_file.get('path')
+        
+        if not media_path or not os.path.exists(media_path):
+            await update.message.reply_text(
+                f"❌ <b>فایل رسانه پیدا نشد!</b>\n\n"
+                f"◄ مسیر فایل: {media_path}\n"
+                "◄ لطفاً دوباره رسانه رو اضافه کنید.",
+                parse_mode='HTML'
+            )
+            del user_sessions[user_id]
+            return
         
         await update.message.reply_text(
-            f"🔄 <b>در حال ارسال به گروه...</b>\n\n"
+            f"🔄 <b>در حال ورود به ویس چت گروه...</b>\n\n"
             f"🔗 لینک: {link}\n"
             f"🎵 رسانه: {media_file.get('name', 'Unknown')}\n"
             f"📊 تعداد اکانت‌ها: {len(accounts)}\n\n"
@@ -531,11 +595,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
+                from pytgcalls import PyTgCalls
+                from pytgcalls.types import AudioQuality
+                from pytgcalls.types.input_stream import AudioStream, InputAudioStream
                 
                 print(f"🔄 شروع با اکانت: {acc.get('phone')}")
                 
                 app = Client(
-                    f"attack_session_{acc['id']}",
+                    f"play_session_{acc['id']}",
                     api_id=API_ID,
                     api_hash=API_HASH,
                     session_string=acc['session']
@@ -573,29 +640,37 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await app.disconnect()
                         continue
                 
-                # ===== ارسال فایل =====
+                # ===== ورود به ویس چت و پخش =====
                 try:
-                    if is_mp3:
-                        await app.send_audio(chat_id, media_file['file_id'])
-                        print(f"✅ MP3 ارسال شد توسط {acc.get('phone')}")
-                    else:
-                        await app.send_video(chat_id, media_file['file_id'])
-                        print(f"✅ MP4 ارسال شد توسط {acc.get('phone')}")
+                    call = PyTgCalls(app)
+                    await call.start()
+                    print(f"✅ تماس شروع شد برای اکانت {acc.get('phone')}")
+                    
+                    await call.join_group_call(
+                        chat_id,
+                        AudioStream(
+                            InputAudioStream(
+                                media_path,
+                                audio_parameters=AudioQuality.HIGH
+                            )
+                        )
+                    )
+                    print(f"✅ در ویس چت پخش شد در اکانت {acc.get('phone')}")
                     
                     success_count += 1
+                    
                 except Exception as e3:
-                    print(f"❌ خطا در ارسال: {e3}")
-                    error_details.append(f"اکانت {acc.get('phone')}: ارسال نشد - {e3}")
+                    print(f"❌ خطا در پخش: {e3}")
+                    error_details.append(f"اکانت {acc.get('phone')}: پخش نشد - {e3}")
                     fail_count += 1
-                
-                await app.disconnect()
+                    await app.disconnect()
                 
             except Exception as e:
                 print(f"❌ خطای کلی: {e}")
                 error_details.append(f"اکانت {acc.get('phone')}: {e}")
                 fail_count += 1
         
-        result_text = f"✅ <b>عملیات ارسال به گروه کامل شد!</b>\n\n"
+        result_text = f"✅ <b>عملیات ورود به ویس چت کامل شد!</b>\n\n"
         result_text += f"🔗 <b>لینک:</b> {link}\n"
         result_text += f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
         result_text += f"✅ <b>موفق:</b> {success_count} اکانت\n"
@@ -630,7 +705,7 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     try:
-        # پاک کردن Webhook قبل از شروع
+        # پاک کردن Webhook
         print("🔄 در حال پاک کردن Webhook...")
         try:
             response = httpx.post(
@@ -641,7 +716,7 @@ if __name__ == '__main__':
             if response.json().get('ok'):
                 print("✅ Webhook پاک شد")
         except Exception as e:
-            print(f"⚠️ خطا در پاک کردن Webhook: {e}")
+            print(f"⚠️ خطا: {e}")
         
         time.sleep(2)
         
