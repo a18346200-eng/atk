@@ -59,7 +59,7 @@ OWNER_START_TEXT = """
 
 ➕ <b>افزودن اکانت</b> • ایجاد سشن تلگرام
 ⚙️ <b>تنظیمات</b> • مدیریت فایل‌ها و اطلاعات
-💥 <b>حمله</b> • مدیریت گروه‌ها و پخش در ویس چت
+💥 <b>حمله</b> • جوین شدن و پخش در ویس چت
 """
 
 NORMAL_START_TEXT = "⛔ <b>دسترسی محدود</b>"
@@ -72,7 +72,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
             [InlineKeyboardButton("💥 حمله", callback_data='attack')]
         ]
-        text = OWNER_START_TEXT + f"\n\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n📁 <b>تعداد گروه‌ها:</b> {len(joined_groups)}\n🎵 <b>تعداد MP3:</b> {len(mp3_files)}"
+        text = OWNER_START_TEXT + f"\n\n📊 اکانت‌ها: {len(accounts)}\n📁 گروه‌ها: {len(joined_groups)}\n🎵 MP3: {len(mp3_files)}"
         await update.message.reply_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
     else:
         await update.message.reply_text(NORMAL_START_TEXT, parse_mode='HTML')
@@ -80,7 +80,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
-    
     if user_id != OWNER_ID:
         await query.answer("⛔ دسترسی محدود", show_alert=True)
         return
@@ -163,10 +162,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == 'join_group':
         if len(accounts) == 0:
-            await query.edit_message_text("❌ <b>هیچ اکانتی وجود ندارد</b>\n\n🔹 ابتدا اکانت اضافه کنید", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
+            await query.edit_message_text("❌ <b>هیچ اکانتی وجود ندارد</b>", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
             return
         user_sessions[user_id] = {'step': 'join_group_link'}
-        await query.edit_message_text(f"👥 <b>جوین شدن در گروه</b>\n\n🔹 لینک گروه را وارد کنید\n🔹 مثال: <code>https://t.me/joinchat/abc123</code>", parse_mode='HTML')
+        await query.edit_message_text("👥 <b>جوین شدن در گروه</b>\n\n🔹 لینک گروه را وارد کنید\n🔹 مثال: <code>https://t.me/joinchat/abc123</code>", parse_mode='HTML')
     
     elif query.data == 'play_voice':
         if len(accounts) == 0:
@@ -192,21 +191,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_sessions[user_id]['step'] = 'play_select_media'
             keyboard = []
             for i, mp3 in enumerate(mp3_files):
-                keyboard.append([InlineKeyboardButton(f"🎵 {mp3.get('name', f'MP3 {i+1}')}", callback_data=f'play_file_mp3_{i}')])
+                keyboard.append([InlineKeyboardButton(f"🎵 {mp3.get('name', f'MP3 {i+1}')}", callback_data=f'play_mp3_{i}')])
             for i, mp4 in enumerate(mp4_files):
-                keyboard.append([InlineKeyboardButton(f"🎬 {mp4.get('name', f'MP4 {i+1}')}", callback_data=f'play_file_mp4_{i}')])
+                keyboard.append([InlineKeyboardButton(f"🎬 {mp4.get('name', f'MP4 {i+1}')}", callback_data=f'play_mp4_{i}')])
             keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data='play_voice')])
             await query.edit_message_text("🎵 <b>انتخاب رسانه</b>", parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
     
-    elif query.data.startswith('play_file_mp3_'):
-        index = int(query.data.split('_')[3])
+    elif query.data.startswith('play_mp3_'):
+        index = int(query.data.split('_')[2])
         if index < len(mp3_files):
             user_sessions[user_id]['selected_file'] = index
             user_sessions[user_id]['is_mp3'] = True
             await start_playback(update, context, user_id)
     
-    elif query.data.startswith('play_file_mp4_'):
-        index = int(query.data.split('_')[3])
+    elif query.data.startswith('play_mp4_'):
+        index = int(query.data.split('_')[2])
         if index < len(mp4_files):
             user_sessions[user_id]['selected_file'] = index
             user_sessions[user_id]['is_mp3'] = False
@@ -241,7 +240,7 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         del user_sessions[user_id]
         return
     
-    await query.edit_message_text(f"🔄 <b>در حال پخش</b>\n\n📁 {group_name}\n🎵 {media_file.get('name')}", parse_mode='HTML')
+    await query.edit_message_text(f"🔄 <b>در حال پخش در ویس چت</b>\n\n📁 {group_name}\n🎵 {media_file.get('name')}\n⏳ لطفاً صبر کنید...", parse_mode='HTML')
     
     success_count = 0
     fail_count = 0
@@ -263,13 +262,13 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
                     chat_id = chat.id
                 except:
                     if 'joinchat/' in group_link:
-                        invite_code = group_link.split('joinchat/')[-1]
+                        invite = group_link.split('joinchat/')[-1]
                     elif '+' in group_link:
-                        invite_code = group_link.split('+')[-1]
+                        invite = group_link.split('+')[-1]
                     else:
-                        invite_code = group_link.replace('https://t.me/', '').replace('@', '')
-                    if invite_code and not invite_code.startswith('+'):
-                        chat = await app.join_chat(invite_code)
+                        invite = group_link.replace('https://t.me/', '').replace('@', '')
+                    if invite and not invite.startswith('+'):
+                        chat = await app.join_chat(invite)
                         chat_id = chat.id
                     else:
                         chat = await app.get_chat(group_link)
