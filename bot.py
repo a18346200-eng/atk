@@ -20,7 +20,6 @@ user_sessions = {}
 accounts = []
 mp3_files = []
 mp4_files = []
-active_calls = {}
 
 DATA_FILE = "data.json"
 
@@ -436,7 +435,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phone_code_hash = user_sessions[user_id]['phone_code_hash']
             app = user_sessions[user_id]['client']
             
-            await app.sign_in(phone_number=phone, phone_code_hash=phone_code_hash, phone_code=code)
+            # امتحان ورود با کد
+            try:
+                await app.sign_in(phone_number=phone, phone_code_hash=phone_code_hash, phone_code=code)
+            except Exception as sign_in_error:
+                error_msg = str(sign_in_error)
+                # اگر پسورد دو مرحله‌ای نیاز بود
+                if "SESSION_PASSWORD_NEEDED" in error_msg:
+                    user_sessions[user_id]['step'] = 'password'
+                    await update.message.reply_text(
+                        "🔐 <b>مرحله ۴: وارد کردن پسورد دو مرحله‌ای</b>\n\n"
+                        "◄ این اکانت دارای <b>تایید دو مرحله‌ای</b> است.\n"
+                        "◂ لطفاً <b>پسورد</b> اکانت تلگرام خود را وارد کنید.\n\n"
+                        "⫸ برای لغو: /cancel",
+                        parse_mode='HTML'
+                    )
+                    return
+                else:
+                    raise sign_in_error
+            
+            # اگر ورود موفق بود
             session_string = await app.export_session_string()
             
             account_info = {
@@ -458,6 +476,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await app.disconnect()
             if user_id in user_sessions:
                 del user_sessions[user_id]
+                
         except Exception as e:
             error_msg = str(e)
             if "PHONE_CODE_EXPIRED" in error_msg:
@@ -489,6 +508,65 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     except:
                         pass
                 del user_sessions[user_id]
+        return
+    
+    # ========== مرحله ۴: دریافت پسورد دو مرحله‌ای ==========
+    if user_id in user_sessions and user_sessions[user_id].get('step') == 'password':
+        password = update.message.text.strip()
+        
+        try:
+            phone = user_sessions[user_id]['phone']
+            app = user_sessions[user_id]['client']
+            
+            # ورود با پسورد
+            await app.check_password(password)
+            
+            # ساخت سشن
+            session_string = await app.export_session_string()
+            
+            account_info = {
+                'phone': phone,
+                'session': session_string,
+                'id': len(accounts) + 1
+            }
+            accounts.append(account_info)
+            save_data()
+            
+            await update.message.reply_text(
+                f"✅ <b>سشن ساخته شد!</b>\n\n"
+                f"📱 <b>شماره:</b> <code>{phone}</code>\n"
+                f"🆔 <b>شناسه:</b> {len(accounts)}\n\n"
+                f"📊 <b>تعداد کل اکانت‌ها:</b> {len(accounts)}",
+                parse_mode='HTML'
+            )
+            
+            await app.disconnect()
+            if user_id in user_sessions:
+                del user_sessions[user_id]
+                
+        except Exception as e:
+            error_msg = str(e)
+            if "PASSWORD_HASH_INVALID" in error_msg:
+                await update.message.reply_text(
+                    "❌ <b>پسورد اشتباه است!</b>\n\n"
+                    "◄ لطفاً پسورد صحیح را وارد کنید.\n"
+                    "⫸ برای لغو: /cancel",
+                    parse_mode='HTML'
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ <b>خطا در تایید پسورد!</b>\n\n"
+                    f"◄ خطا: <code>{error_msg}</code>\n"
+                    "⫸ /start را بزن و دوباره تلاش کن.",
+                    parse_mode='HTML'
+                )
+                if user_id in user_sessions:
+                    if 'client' in user_sessions[user_id]:
+                        try:
+                            await user_sessions[user_id]['client'].disconnect()
+                        except:
+                            pass
+                    del user_sessions[user_id]
         return
     
     # ========== افزودن MP3 ==========
@@ -671,14 +749,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         )
                         print(f"✅ MP4 پخش شد در اکانت {acc.get('phone')}")
                     
-                    if acc['id'] not in active_calls:
-                        active_calls[acc['id']] = []
-                    active_calls[acc['id']].append({
-                        'chat_id': chat_id,
-                        'call': call,
-                        'app': app
-                    })
-                    
                     success_count += 1
                     
                 except Exception as e3:
@@ -727,7 +797,6 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     try:
-        # پاک کردن Webhook
         print("🔄 در حال پاک کردن Webhook...")
         try:
             response = httpx.post(
