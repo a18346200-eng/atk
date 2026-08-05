@@ -342,7 +342,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    """پخش در ویسچت با pytgcalls 1.2.0"""
+    """پخش در ویسچت با py-tgcalls"""
     query = update.callback_query
     
     group_index = user_sessions[user_id]['selected_group']
@@ -381,9 +381,9 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     for acc in accounts:
         try:
             from pyrogram import Client
-            from pytgcalls import PyTgCalls
-            from pytgcalls.types import AudioQuality
-            from pytgcalls.types.input_stream import AudioStream, InputAudioStream
+            from py_tgcalls import PyTgCalls
+            from py_tgcalls.types import AudioQuality
+            from py_tgcalls.types.input_stream import AudioStream, InputAudioStream
             
             app = Client(
                 f"play_session_{acc['id']}",
@@ -471,7 +471,7 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """متوقف کردن پخش"""
     try:
         from pyrogram import Client
-        from pytgcalls import PyTgCalls
+        from py_tgcalls import PyTgCalls
         
         stopped_count = 0
         for acc in accounts:
