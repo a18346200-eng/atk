@@ -333,7 +333,7 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """متوقف کردن پخش در همه گروه‌ها"""
     try:
         from pyrogram import Client
-        from py_tgcalls import PyTgCalls
+        from tgcaller import TgCaller
         
         stopped_count = 0
         for acc in accounts:
@@ -346,18 +346,10 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
                 await app.connect()
                 
-                call = PyTgCalls(app)
-                await call.start()
+                caller = TgCaller(app)
+                await caller.leave_all_calls()
+                stopped_count += 1
                 
-                async for dialog in app.get_dialogs():
-                    if dialog.chat.type in ["group", "supergroup"]:
-                        try:
-                            await call.leave_group_call(dialog.chat.id)
-                            stopped_count += 1
-                        except:
-                            pass
-                
-                await call.stop()
                 await app.disconnect()
             except:
                 pass
@@ -728,11 +720,174 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del user_sessions[user_id]
         return
     
-    # ========== پخش در ویس چت گروه با py-tgcalls ==========
+    # ========== پخش در ویس چت گروه با tgcaller ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'play_group_link':
         link = update.message.text.strip()
         
         media_index = user_sessions[user_id].get('selected_mp3')
         is_mp3 = True
         if media_index is None:
-            media_index = user
+            media_index = user_sessions[user_id].get('selected_mp4')
+            is_mp3 = False
+        
+        if media_index is None:
+            await update.message.reply_text("❌ رسانه‌ای انتخاب نشده! دوباره تلاش کنید.")
+            del user_sessions[user_id]
+            return
+        
+        media_file = mp3_files[media_index] if is_mp3 else mp4_files[media_index]
+        media_path = media_file.get('path')
+        
+        if not media_path or not os.path.exists(media_path):
+            await update.message.reply_text(
+                f"❌ <b>فایل رسانه پیدا نشد!</b>\n\n"
+                f"◄ مسیر فایل: {media_path}\n"
+                "◄ لطفاً دوباره رسانه رو اضافه کنید.",
+                parse_mode='HTML'
+            )
+            del user_sessions[user_id]
+            return
+        
+        await update.message.reply_text(
+            f"🔄 <b>در حال پخش در ویس چت گروه...</b>\n\n"
+            f"🔗 لینک: {link}\n"
+            f"🎵 رسانه: {media_file.get('name', 'Unknown')}\n"
+            f"📊 تعداد اکانت‌ها: {len(accounts)}\n\n"
+            "⏳ لطفاً صبر کنید...",
+            parse_mode='HTML'
+        )
+        
+        success_count = 0
+        fail_count = 0
+        error_details = []
+        
+        for acc in accounts:
+            try:
+                from pyrogram import Client
+                from tgcaller import TgCaller
+                
+                app = Client(
+                    f"play_session_{acc['id']}",
+                    api_id=API_ID,
+                    api_hash=API_HASH,
+                    session_string=acc['session']
+                )
+                await app.connect()
+                
+                # جوین شدن در گروه
+                try:
+                    chat = await app.join_chat(link)
+                    chat_id = chat.id
+                except Exception as e1:
+                    try:
+                        if 'joinchat/' in link:
+                            invite_code = link.split('joinchat/')[-1]
+                        elif '+' in link:
+                            invite_code = link.split('+')[-1]
+                        else:
+                            invite_code = link.replace('https://t.me/', '').replace('@', '')
+                        
+                        if invite_code and not invite_code.startswith('+'):
+                            chat = await app.join_chat(invite_code)
+                            chat_id = chat.id
+                        else:
+                            chat = await app.get_chat(link)
+                            chat_id = chat.id
+                            await app.join_chat(chat_id)
+                    except Exception as e2:
+                        error_details.append(f"اکانت {acc.get('phone')}: جوین نشد - {e2}")
+                        fail_count += 1
+                        await app.disconnect()
+                        continue
+                
+                # پخش در ویس چت با tgcaller
+                try:
+                    caller = TgCaller(app)
+                    await caller.join_call(chat_id)
+                    await caller.play(media_path)
+                    
+                    success_count += 1
+                    
+                except Exception as e3:
+                    error_details.append(f"اکانت {acc.get('phone')}: پخش نشد - {e3}")
+                    fail_count += 1
+                    await app.disconnect()
+                
+            except Exception as e:
+                error_details.append(f"اکانت {acc.get('phone')}: {e}")
+                fail_count += 1
+        
+        result_text = f"✅ <b>عملیات پخش در ویس چت کامل شد!</b>\n\n"
+        result_text += f"🔗 <b>لینک:</b> {link}\n"
+        result_text += f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
+        result_text += f"✅ <b>موفق:</b> {success_count} اکانت\n"
+        result_text += f"❌ <b>ناموفق:</b> {fail_count} اکانت\n"
+        result_text += f"📊 <b>مجموع:</b> {len(accounts)} اکانت\n"
+        
+        if error_details:
+            result_text += f"\n⚠️ <b>خطاها:</b>\n"
+            for err in error_details[:3]:
+                result_text += f"◄ {err[:100]}...\n"
+        
+        await update.message.reply_text(
+            result_text,
+            parse_mode='HTML'
+        )
+        
+        del user_sessions[user_id]
+        return
+
+async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id in user_sessions:
+        if 'client' in user_sessions[user_id]:
+            try:
+                await user_sessions[user_id]['client'].disconnect()
+            except:
+                pass
+        del user_sessions[user_id]
+        await update.message.reply_text("❌ عملیات لغو شد!")
+    else:
+        await update.message.reply_text("ℹ️ هیچ عملیاتی وجود ندارد!")
+
+if __name__ == '__main__':
+    try:
+        print("🔄 در حال پاک کردن Webhook...")
+        try:
+            response = httpx.post(
+                f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
+                json={"drop_pending_updates": True},
+                timeout=30
+            )
+            if response.json().get('ok'):
+                print("✅ Webhook پاک شد")
+        except Exception as e:
+            print(f"⚠️ خطا: {e}")
+        
+        time.sleep(2)
+        
+        print("🚀 ربات در حال راه‌اندازی...")
+        print(f"🔑 API_ID: {API_ID}")
+        print(f"📊 تعداد اکانت‌ها: {len(accounts)}")
+        print(f"🎵 تعداد MP3: {len(mp3_files)}")
+        print(f"🎬 تعداد MP4: {len(mp4_files)}")
+        
+        application = Application.builder().token(TOKEN).build()
+        
+        application.add_handler(CommandHandler('start', start))
+        application.add_handler(CommandHandler('cancel', cancel_command))
+        application.add_handler(CallbackQueryHandler(button_callback))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_handler(MessageHandler(filters.AUDIO, handle_message))
+        application.add_handler(MessageHandler(filters.VIDEO, handle_message))
+        
+        print(f"✅ ربات با موفقیت راه‌اندازی شد!")
+        print(f"👤 سازنده: {OWNER_ID}")
+        
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=['message', 'callback_query']
+        )
+        
+    except Exception as e:
+        print(f"❌ خطا: {e}")
