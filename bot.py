@@ -203,22 +203,45 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == 'attack':
         keyboard = [
-            [InlineKeyboardButton("👥 پخش در ویس چت گروه", callback_data='attack_group')],
+            [InlineKeyboardButton("👥 جوین شدن در گروه", callback_data='join_group')],
+            [InlineKeyboardButton("🎵 پخش در ویس چت گروه", callback_data='play_voice')],
             [InlineKeyboardButton("⏹️ توقف پخش", callback_data='stop_playback')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
         ]
         await query.edit_message_text(
-            "💥 <b>بخش پخش در ویس چت</b>\n\n"
+            "💥 <b>بخش حمله</b>\n\n"
             "◄ لطفاً عملیات مورد نظر رو انتخاب کنید:\n\n"
+            "🔹 <b>جوین شدن در گروه:</b> فقط وارد گروه میشه\n"
             "🔹 <b>پخش در ویس چت:</b> جوین شده و در ویس چت پخش میکنه\n"
-            "🔹 <b>توقف پخش:</b> متوقف کردن پخش در همه گروه‌ها\n\n"
+            "🔹 <b>توقف پخش:</b> متوقف کردن پخش و خروج از ویس چت\n\n"
             f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n"
             f"🎵 <b>MP3:</b> {len(mp3_files)} | 🎬 <b>MP4:</b> {len(mp4_files)}",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    elif query.data == 'attack_group':
+    elif query.data == 'join_group':
+        if len(accounts) == 0:
+            await query.edit_message_text(
+                "❌ <b>هیچ اکانتی وجود ندارد!</b>\n\n"
+                "◄ لطفاً ابتدا از بخش <b>افزودن اکانت</b> یک اکانت اضافه کنید.",
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
+            )
+            return
+        
+        user_sessions[user_id] = {'step': 'join_group_link'}
+        await query.edit_message_text(
+            "👥 <b>جوین شدن در گروه</b>\n\n"
+            "◄ لطفاً <b>لینک گروه</b> را وارد کنید.\n"
+            "◂ مثال: <code>https://t.me/joinchat/abc123</code>\n"
+            "◂ یا: <code>https://t.me/groupusername</code>\n\n"
+            f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n\n"
+            "⫸ برای لغو: /cancel",
+            parse_mode='HTML'
+        )
+    
+    elif query.data == 'play_voice':
         if len(accounts) == 0:
             await query.edit_message_text(
                 "❌ <b>هیچ اکانتی وجود ندارد!</b>\n\n"
@@ -244,7 +267,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append([InlineKeyboardButton(f"🎬 {mp4.get('name', f'MP4 {i}')}", callback_data=f'play_mp4_{i-1}')])
         keyboard.append([InlineKeyboardButton("🔙 بازگشت", callback_data='attack')])
         
-        user_sessions[user_id] = {'step': 'attack_group_select'}
+        user_sessions[user_id] = {'step': 'play_select'}
         await query.edit_message_text(
             "🎵 <b>انتخاب رسانه برای پخش در ویس چت</b>\n\n"
             "◄ لطفاً یکی از رسانه‌های زیر رو انتخاب کنید:\n\n"
@@ -257,7 +280,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         index = int(query.data.split('_')[2])
         if index < len(mp3_files):
             user_sessions[user_id]['selected_mp3'] = index
-            user_sessions[user_id]['step'] = 'attack_group_link'
+            user_sessions[user_id]['step'] = 'play_group_link'
             
             await query.edit_message_text(
                 f"✅ <b>MP3 انتخاب شد:</b> {mp3_files[index].get('name', 'MP3')}\n\n"
@@ -273,7 +296,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         index = int(query.data.split('_')[2])
         if index < len(mp4_files):
             user_sessions[user_id]['selected_mp4'] = index
-            user_sessions[user_id]['step'] = 'attack_group_link'
+            user_sessions[user_id]['step'] = 'play_group_link'
             
             await query.edit_message_text(
                 f"✅ <b>MP4 انتخاب شد:</b> {mp4_files[index].get('name', 'MP4')}\n\n"
@@ -436,7 +459,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phone_code_hash = user_sessions[user_id]['phone_code_hash']
             app = user_sessions[user_id]['client']
             
-            # امتحان ورود با کد
             try:
                 await app.sign_in(phone_number=phone, phone_code_hash=phone_code_hash, phone_code=code)
             except Exception as sign_in_error:
@@ -628,8 +650,95 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ لطفاً یک فایل MP4 ارسال کنید!")
         return
     
+    # ========== جوین شدن در گروه ==========
+    if user_id in user_sessions and user_sessions[user_id].get('step') == 'join_group_link':
+        link = update.message.text.strip()
+        
+        await update.message.reply_text(
+            f"🔄 <b>در حال جوین شدن در گروه...</b>\n\n"
+            f"🔗 لینک: {link}\n"
+            f"📊 تعداد اکانت‌ها: {len(accounts)}\n\n"
+            "⏳ لطفاً صبر کنید...",
+            parse_mode='HTML'
+        )
+        
+        success_count = 0
+        fail_count = 0
+        error_details = []
+        
+        for acc in accounts:
+            try:
+                from pyrogram import Client
+                
+                print(f"🔄 شروع با اکانت: {acc.get('phone')}")
+                
+                app = Client(
+                    f"join_session_{acc['id']}",
+                    api_id=API_ID,
+                    api_hash=API_HASH,
+                    session_string=acc['session']
+                )
+                await app.connect()
+                print(f"✅ اکانت {acc.get('phone')} متصل شد")
+                
+                try:
+                    chat = await app.join_chat(link)
+                    chat_id = chat.id
+                    print(f"✅ جوین شد با لینک: {chat_id}")
+                except Exception as e1:
+                    print(f"⚠️ خطا در جوین با لینک: {e1}")
+                    try:
+                        if 'joinchat/' in link:
+                            invite_code = link.split('joinchat/')[-1]
+                        elif '+' in link:
+                            invite_code = link.split('+')[-1]
+                        else:
+                            invite_code = link.replace('https://t.me/', '').replace('@', '')
+                        
+                        if invite_code and not invite_code.startswith('+'):
+                            chat = await app.join_chat(invite_code)
+                            chat_id = chat.id
+                        else:
+                            chat = await app.get_chat(link)
+                            chat_id = chat.id
+                            await app.join_chat(chat_id)
+                        print(f"✅ جوین شد با روش جایگزین: {chat_id}")
+                    except Exception as e2:
+                        print(f"❌ خطا در جوین: {e2}")
+                        error_details.append(f"اکانت {acc.get('phone')}: جوین نشد - {e2}")
+                        fail_count += 1
+                        await app.disconnect()
+                        continue
+                
+                success_count += 1
+                await app.disconnect()
+                
+            except Exception as e:
+                print(f"❌ خطای کلی: {e}")
+                error_details.append(f"اکانت {acc.get('phone')}: {e}")
+                fail_count += 1
+        
+        result_text = f"✅ <b>عملیات جوین شدن در گروه کامل شد!</b>\n\n"
+        result_text += f"🔗 <b>لینک:</b> {link}\n"
+        result_text += f"✅ <b>موفق:</b> {success_count} اکانت\n"
+        result_text += f"❌ <b>ناموفق:</b> {fail_count} اکانت\n"
+        result_text += f"📊 <b>مجموع:</b> {len(accounts)} اکانت\n"
+        
+        if error_details:
+            result_text += f"\n⚠️ <b>خطاها:</b>\n"
+            for err in error_details[:3]:
+                result_text += f"◄ {err[:100]}...\n"
+        
+        await update.message.reply_text(
+            result_text,
+            parse_mode='HTML'
+        )
+        
+        del user_sessions[user_id]
+        return
+    
     # ========== پخش در ویس چت گروه ==========
-    if user_id in user_sessions and user_sessions[user_id].get('step') == 'attack_group_link':
+    if user_id in user_sessions and user_sessions[user_id].get('step') == 'play_group_link':
         link = update.message.text.strip()
         
         media_index = user_sessions[user_id].get('selected_mp3')
@@ -687,7 +796,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await app.connect()
                 print(f"✅ اکانت {acc.get('phone')} متصل شد")
                 
-                # ===== جوین شدن در گروه =====
                 try:
                     chat = await app.join_chat(link)
                     chat_id = chat.id
@@ -717,7 +825,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await app.disconnect()
                         continue
                 
-                # ===== پخش در ویس چت =====
                 try:
                     call = PyTgCalls(app)
                     await call.start()
