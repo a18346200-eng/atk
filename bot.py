@@ -20,6 +20,7 @@ user_sessions = {}
 accounts = []
 mp3_files = []
 mp4_files = []
+active_calls = {}
 
 DATA_FILE = "data.json"
 
@@ -310,7 +311,7 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """متوقف کردن پخش در همه گروه‌ها"""
     try:
         from pyrogram import Client
-        from py_tgcalls import PyTgCalls
+        from pytgcalls import PyTgCalls
         
         stopped_count = 0
         for acc in accounts:
@@ -440,7 +441,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await app.sign_in(phone_number=phone, phone_code_hash=phone_code_hash, phone_code=code)
             except Exception as sign_in_error:
                 error_msg = str(sign_in_error)
-                # اگر پسورد دو مرحله‌ای نیاز بود
                 if "SESSION_PASSWORD_NEEDED" in error_msg:
                     user_sessions[user_id]['step'] = 'password'
                     await update.message.reply_text(
@@ -454,7 +454,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     raise sign_in_error
             
-            # اگر ورود موفق بود
             session_string = await app.export_session_string()
             
             account_info = {
@@ -518,10 +517,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phone = user_sessions[user_id]['phone']
             app = user_sessions[user_id]['client']
             
-            # ورود با پسورد
             await app.check_password(password)
             
-            # ساخت سشن
             session_string = await app.export_session_string()
             
             account_info = {
@@ -675,9 +672,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in accounts:
             try:
                 from pyrogram import Client
-                from py_tgcalls import PyTgCalls
-                from py_tgcalls.types import AudioQuality, VideoQuality
-                from py_tgcalls.types.input_stream import AudioStream, VideoStream, InputAudioStream, InputVideoStream
+                from pytgcalls import PyTgCalls
+                from pytgcalls.types import AudioQuality
+                from pytgcalls.types.input_stream import AudioStream, InputAudioStream
                 
                 print(f"🔄 شروع با اکانت: {acc.get('phone')}")
                 
@@ -726,28 +723,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await call.start()
                     print(f"✅ تماس شروع شد برای اکانت {acc.get('phone')}")
                     
-                    if is_mp3:
-                        await call.join_group_call(
-                            chat_id,
-                            AudioStream(
-                                InputAudioStream(
-                                    media_path,
-                                    audio_parameters=AudioQuality.HIGH
-                                )
+                    await call.join_group_call(
+                        chat_id,
+                        AudioStream(
+                            InputAudioStream(
+                                media_path,
+                                audio_parameters=AudioQuality.HIGH
                             )
                         )
-                        print(f"✅ MP3 پخش شد در اکانت {acc.get('phone')}")
-                    else:
-                        await call.join_group_call(
-                            chat_id,
-                            VideoStream(
-                                InputVideoStream(
-                                    media_path,
-                                    video_parameters=VideoQuality.HIGH
-                                )
-                            )
-                        )
-                        print(f"✅ MP4 پخش شد در اکانت {acc.get('phone')}")
+                    )
+                    print(f"✅ MP3 پخش شد در اکانت {acc.get('phone')}")
+                    
+                    if acc['id'] not in active_calls:
+                        active_calls[acc['id']] = []
+                    active_calls[acc['id']].append({
+                        'chat_id': chat_id,
+                        'call': call,
+                        'app': app
+                    })
                     
                     success_count += 1
                     
