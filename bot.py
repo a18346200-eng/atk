@@ -20,7 +20,6 @@ user_sessions = {}
 accounts = []
 mp3_files = []
 mp4_files = []
-active_calls = {}
 
 DATA_FILE = "data.json"
 
@@ -670,8 +669,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 from pyrogram import Client
                 
-                print(f"🔄 شروع با اکانت: {acc.get('phone')}")
-                
                 app = Client(
                     f"join_session_{acc['id']}",
                     api_id=API_ID,
@@ -679,14 +676,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     session_string=acc['session']
                 )
                 await app.connect()
-                print(f"✅ اکانت {acc.get('phone')} متصل شد")
                 
                 try:
                     chat = await app.join_chat(link)
                     chat_id = chat.id
-                    print(f"✅ جوین شد با لینک: {chat_id}")
                 except Exception as e1:
-                    print(f"⚠️ خطا در جوین با لینک: {e1}")
                     try:
                         if 'joinchat/' in link:
                             invite_code = link.split('joinchat/')[-1]
@@ -702,9 +696,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             chat = await app.get_chat(link)
                             chat_id = chat.id
                             await app.join_chat(chat_id)
-                        print(f"✅ جوین شد با روش جایگزین: {chat_id}")
                     except Exception as e2:
-                        print(f"❌ خطا در جوین: {e2}")
                         error_details.append(f"اکانت {acc.get('phone')}: جوین نشد - {e2}")
                         fail_count += 1
                         await app.disconnect()
@@ -714,7 +706,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await app.disconnect()
                 
             except Exception as e:
-                print(f"❌ خطای کلی: {e}")
                 error_details.append(f"اکانت {acc.get('phone')}: {e}")
                 fail_count += 1
         
@@ -785,8 +776,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 from pytgcalls.types import AudioQuality
                 from pytgcalls.types.input_stream import AudioStream, InputAudioStream
                 
-                print(f"🔄 شروع با اکانت: {acc.get('phone')}")
-                
                 app = Client(
                     f"play_session_{acc['id']}",
                     api_id=API_ID,
@@ -794,14 +783,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     session_string=acc['session']
                 )
                 await app.connect()
-                print(f"✅ اکانت {acc.get('phone')} متصل شد")
                 
                 try:
                     chat = await app.join_chat(link)
                     chat_id = chat.id
-                    print(f"✅ جوین شد با لینک: {chat_id}")
                 except Exception as e1:
-                    print(f"⚠️ خطا در جوین با لینک: {e1}")
                     try:
                         if 'joinchat/' in link:
                             invite_code = link.split('joinchat/')[-1]
@@ -817,9 +803,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             chat = await app.get_chat(link)
                             chat_id = chat.id
                             await app.join_chat(chat_id)
-                        print(f"✅ جوین شد با روش جایگزین: {chat_id}")
                     except Exception as e2:
-                        print(f"❌ خطا در جوین: {e2}")
                         error_details.append(f"اکانت {acc.get('phone')}: جوین نشد - {e2}")
                         fail_count += 1
                         await app.disconnect()
@@ -828,7 +812,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     call = PyTgCalls(app)
                     await call.start()
-                    print(f"✅ تماس شروع شد برای اکانت {acc.get('phone')}")
                     
                     await call.join_group_call(
                         chat_id,
@@ -839,26 +822,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             )
                         )
                     )
-                    print(f"✅ MP3 پخش شد در اکانت {acc.get('phone')}")
-                    
-                    if acc['id'] not in active_calls:
-                        active_calls[acc['id']] = []
-                    active_calls[acc['id']].append({
-                        'chat_id': chat_id,
-                        'call': call,
-                        'app': app
-                    })
                     
                     success_count += 1
                     
                 except Exception as e3:
-                    print(f"❌ خطا در پخش: {e3}")
                     error_details.append(f"اکانت {acc.get('phone')}: پخش نشد - {e3}")
                     fail_count += 1
                     await app.disconnect()
                 
             except Exception as e:
-                print(f"❌ خطای کلی: {e}")
                 error_details.append(f"اکانت {acc.get('phone')}: {e}")
                 fail_count += 1
         
