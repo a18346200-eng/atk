@@ -250,9 +250,9 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     for acc in accounts:
         try:
             from pyrogram import Client
-            from py_tgcalls import PyTgCalls
-            from py_tgcalls.types import AudioQuality
-            from py_tgcalls.types.input_stream import AudioStream, InputAudioStream
+            from pytgcalls import PyTgCalls
+            from pytgcalls.types import AudioQuality
+            from pytgcalls.types.input_stream import AudioStream, InputAudioStream
             
             app = Client(f"play_{acc['id']}", api_id=API_ID, api_hash=API_HASH, session_string=acc['session'])
             await app.connect()
@@ -297,7 +297,7 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
 async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         from pyrogram import Client
-        from py_tgcalls import PyTgCalls
+        from pytgcalls import PyTgCalls
         stopped = 0
         for acc in accounts:
             try:
