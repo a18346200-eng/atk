@@ -20,7 +20,7 @@ user_sessions = {}
 accounts = []
 mp3_files = []
 mp4_files = []
-joined_groups = []  # ذخیره گروه‌هایی که جوین شدیم
+joined_groups = []
 
 DATA_FILE = "data.json"
 
@@ -52,16 +52,16 @@ def save_data():
 load_data()
 
 OWNER_START_TEXT = """
-🌟 <b>سازنده ربات عزیز به ربات ZX خوش آمدید!</b> 🌹
+🌟 <b>به ربات ZX خوش آمدید</b>
 
-📌 لطفاً از منوی زیر کار خودتون رو انتخاب کنید:
+💎 <b>سازنده محترم</b>، لطفاً یکی از گزینه‌های زیر را انتخاب کنید:
 
-➕ <b>افزودن اکانت</b> • ساخت سشن تلگرام
-⚙️ <b>تنظیمات</b> • مدیریت فایل‌ها
-💥 <b>حمله</b> • جوین و پخش در ویس چت
+➕ <b>افزودن اکانت</b> • ایجاد سشن تلگرام
+⚙️ <b>تنظیمات</b> • مدیریت فایل‌ها و اطلاعات
+💥 <b>حمله</b> • مدیریت گروه‌ها و پخش در ویس چت
 """
 
-NORMAL_START_TEXT = "⛔ <b>دسترسی محدود!</b>"
+NORMAL_START_TEXT = "⛔ <b>دسترسی محدود</b>"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -85,27 +85,24 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     
     if user_id != OWNER_ID:
-        await query.answer("⛔ دسترسی ندارید!", show_alert=True)
+        await query.answer("⛔ دسترسی محدود", show_alert=True)
         return
     
     await query.answer()
     
-    # ========== افزودن اکانت ==========
     if query.data == 'add_account':
         user_sessions[user_id] = {'step': 'phone', 'api_id': API_ID, 'api_hash': API_HASH}
         keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]]
         await query.edit_message_text(
-            "📱 <b>مرحله ۱: وارد کردن شماره تلفن</b>\n\n"
-            "◄ لطفاً <b>شماره تلفن</b> اکانت تلگرام خود را وارد کنید.\n"
-            "◄ مثال: <code>+989123456789</code>\n\n"
+            "📱 <b>ایجاد سشن جدید</b>\n\n"
+            "🔹 لطفاً شماره تلفن اکانت تلگرام خود را وارد کنید\n"
+            "🔹 مثال: <code>+989123456789</code>\n\n"
             f"🔑 API_ID: <code>{API_ID}</code>\n"
-            f"🔑 API_HASH: <code>{API_HASH}</code>\n\n"
-            "🔹 برای لغو: /cancel",
+            f"🔑 API_HASH: <code>{API_HASH}</code>",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    # ========== تنظیمات ==========
     elif query.data == 'settings':
         keyboard = [
             [InlineKeyboardButton("🎵 افزودن MP3", callback_data='add_mp3')],
@@ -117,7 +114,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
         ]
         
-        text = f"⚙️ <b>تنظیمات ربات</b>\n\n"
+        text = f"⚙️ <b>تنظیمات</b>\n\n"
         text += f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n"
         text += f"🎵 <b>تعداد MP3:</b> {len(mp3_files)}\n"
         text += f"🎬 <b>تعداد MP4:</b> {len(mp4_files)}\n"
@@ -132,15 +129,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'list_groups':
         if not joined_groups:
             await query.edit_message_text(
-                "📁 <b>لیست گروه‌ها</b>\n\n❌ هنوز هیچ گروهی اضافه نشده!",
+                "📁 <b>لیست گروه‌ها</b>\n\n❌ هیچ گروهی یافت نشد",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]])
             )
         else:
-            text = "📁 <b>لیست گروه‌های جوین شده:</b>\n\n"
+            text = "📁 <b>گروه‌های جوین شده</b>\n\n"
             for i, group in enumerate(joined_groups, 1):
                 text += f"{i}. {group.get('name', 'نامشخص')}\n"
-                text += f"   🆔 {group.get('link', '')}\n\n"
+                text += f"🆔 {group.get('link', '')}\n\n"
             await query.edit_message_text(
                 text,
                 parse_mode='HTML',
@@ -150,12 +147,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'list_accounts':
         if not accounts:
             await query.edit_message_text(
-                "📋 <b>لیست اکانت‌ها</b>\n\n❌ هنوز هیچ اکانتی اضافه نشده!",
+                "📋 <b>لیست اکانت‌ها</b>\n\n❌ هیچ اکانتی یافت نشد",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]])
             )
         else:
-            text = "📋 <b>لیست اکانت‌های اضافه شده:</b>\n\n"
+            text = "📋 <b>لیست اکانت‌ها</b>\n\n"
             for i, acc in enumerate(accounts, 1):
                 text += f"{i}. 📱 {acc.get('phone', 'نامشخص')}\n"
             await query.edit_message_text(
@@ -167,12 +164,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'list_mp3':
         if not mp3_files:
             await query.edit_message_text(
-                "🎵 <b>لیست MP3</b>\n\n❌ هیچ MP3 ای اضافه نشده!",
+                "🎵 <b>لیست MP3</b>\n\n❌ هیچ فایل MP3 یافت نشد",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]])
             )
         else:
-            text = "🎵 <b>لیست MP3های اضافه شده:</b>\n\n"
+            text = "🎵 <b>لیست فایل‌های MP3</b>\n\n"
             for i, mp3 in enumerate(mp3_files, 1):
                 text += f"{i}. 🎵 {mp3.get('name', 'نامشخص')}\n"
             await query.edit_message_text(
@@ -184,12 +181,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'list_mp4':
         if not mp4_files:
             await query.edit_message_text(
-                "🎬 <b>لیست MP4</b>\n\n❌ هیچ MP4 ای اضافه نشده!",
+                "🎬 <b>لیست MP4</b>\n\n❌ هیچ فایل MP4 یافت نشد",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]])
             )
         else:
-            text = "🎬 <b>لیست MP4های اضافه شده:</b>\n\n"
+            text = "🎬 <b>لیست فایل‌های MP4</b>\n\n"
             for i, mp4 in enumerate(mp4_files, 1):
                 text += f"{i}. 🎬 {mp4.get('name', 'نامشخص')}\n"
             await query.edit_message_text(
@@ -202,10 +199,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_sessions[user_id] = {'step': 'mp3'}
         keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]
         await query.edit_message_text(
-            "🎵 <b>افزودن MP3</b>\n\n"
-            "◄ لطفاً فایل <b>MP3</b> خود را ارسال کنید.\n"
-            "◄ ربات فایل را کامل ذخیره کرده و برای پخش استفاده خواهد کرد.\n\n"
-            "🔹 برای لغو: /cancel",
+            "🎵 <b>افزودن فایل MP3</b>\n\n"
+            "🔹 لطفاً فایل MP3 خود را ارسال کنید\n"
+            "🔹 فایل در سرور ذخیره خواهد شد",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -214,15 +210,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_sessions[user_id] = {'step': 'mp4'}
         keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]
         await query.edit_message_text(
-            "🎬 <b>افزودن MP4</b>\n\n"
-            "◄ لطفاً فایل <b>MP4</b> خود را ارسال کنید.\n"
-            "◄ ربات فایل را کامل ذخیره کرده و برای پخش استفاده خواهد کرد.\n\n"
-            "🔹 برای لغو: /cancel",
+            "🎬 <b>افزودن فایل MP4</b>\n\n"
+            "🔹 لطفاً فایل MP4 خود را ارسال کنید\n"
+            "🔹 فایل در سرور ذخیره خواهد شد",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    # ========== حمله ==========
     elif query.data == 'attack':
         keyboard = [
             [InlineKeyboardButton("👥 جوین شدن در گروه", callback_data='join_group')],
@@ -231,23 +225,21 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
         ]
         await query.edit_message_text(
-            "💥 <b>بخش حمله</b>\n\n"
-            "📌 لطفاً عملیات مورد نظر رو انتخاب کنید:\n\n"
-            "👥 <b>جوین شدن در گروه:</b> فقط وارد گروه میشه\n"
-            "🎵 <b>پخش در ویس چت:</b> انتخاب گروه و پخش\n"
-            "⏹️ <b>توقف پخش:</b> متوقف کردن پخش\n\n"
+            "💥 <b>مدیریت حمله</b>\n\n"
+            "🔹 <b>جوین شدن در گروه:</b> ورود به گروه جدید\n"
+            "🔹 <b>پخش در ویس چت:</b> انتخاب گروه و پخش رسانه\n"
+            "🔹 <b>توقف پخش:</b> پایان پخش در تمام گروه‌ها\n\n"
             f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n"
             f"🎵 <b>MP3:</b> {len(mp3_files)} | 🎬 <b>MP4:</b> {len(mp4_files)}",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    # ========== جوین شدن در گروه ==========
     elif query.data == 'join_group':
         if len(accounts) == 0:
             await query.edit_message_text(
-                "❌ <b>هیچ اکانتی وجود ندارد!</b>\n\n"
-                "◄ لطفاً ابتدا از بخش <b>افزودن اکانت</b> یک اکانت اضافه کنید.",
+                "❌ <b>هیچ اکانتی وجود ندارد</b>\n\n"
+                "🔹 لطفاً ابتدا از بخش <b>افزودن اکانت</b> یک اکانت اضافه کنید",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
             )
@@ -256,20 +248,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_sessions[user_id] = {'step': 'join_group_link'}
         await query.edit_message_text(
             "👥 <b>جوین شدن در گروه</b>\n\n"
-            "◄ لطفاً <b>لینک گروه</b> را وارد کنید.\n"
-            "◄ مثال: <code>https://t.me/joinchat/abc123</code>\n"
-            "◄ یا: <code>https://t.me/groupusername</code>\n\n"
-            f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n\n"
-            "🔹 برای لغو: /cancel",
+            "🔹 لطفاً لینک گروه را وارد کنید\n"
+            "🔹 مثال: <code>https://t.me/joinchat/abc123</code>\n\n"
+            f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}",
             parse_mode='HTML'
         )
     
-    # ========== پخش در ویس چت ==========
     elif query.data == 'play_voice':
         if len(accounts) == 0:
             await query.edit_message_text(
-                "❌ <b>هیچ اکانتی وجود ندارد!</b>\n\n"
-                "◄ لطفاً ابتدا از بخش <b>افزودن اکانت</b> یک اکانت اضافه کنید.",
+                "❌ <b>هیچ اکانتی وجود ندارد</b>\n\n"
+                "🔹 لطفاً ابتدا از بخش <b>افزودن اکانت</b> یک اکانت اضافه کنید",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
             )
@@ -277,8 +266,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if len(mp3_files) == 0 and len(mp4_files) == 0:
             await query.edit_message_text(
-                "❌ <b>هیچ فایل رسانه‌ای وجود ندارد!</b>\n\n"
-                "◄ لطفاً ابتدا از بخش <b>تنظیمات</b> فایل MP3 یا MP4 اضافه کنید.",
+                "❌ <b>هیچ فایل رسانه‌ای وجود ندارد</b>\n\n"
+                "🔹 لطفاً ابتدا از بخش <b>تنظیمات</b> فایل MP3 یا MP4 اضافه کنید",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
             )
@@ -286,14 +275,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if len(joined_groups) == 0:
             await query.edit_message_text(
-                "❌ <b>هیچ گروهی وجود ندارد!</b>\n\n"
-                "◄ لطفاً ابتدا از بخش <b>جوین شدن در گروه</b> یک گروه اضافه کنید.",
+                "❌ <b>هیچ گروهی وجود ندارد</b>\n\n"
+                "🔹 لطفاً ابتدا از بخش <b>جوین شدن در گروه</b> یک گروه اضافه کنید",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
             )
             return
         
-        # نمایش لیست گروه‌ها
         keyboard = []
         for i, group in enumerate(joined_groups):
             keyboard.append([InlineKeyboardButton(f"📁 {group.get('name', f'گروه {i+1}')}", callback_data=f'play_group_{i}')])
@@ -301,9 +289,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         user_sessions[user_id] = {'step': 'play_select_group'}
         await query.edit_message_text(
-            "🎵 <b>انتخاب گروه برای پخش</b>\n\n"
-            "📌 لطفاً گروه مورد نظر رو انتخاب کنید:\n\n"
-            f"📊 <b>تعداد گروه‌ها:</b> {len(joined_groups)}",
+            "🎵 <b>انتخاب گروه</b>\n\n"
+            "🔹 لطفاً گروه مورد نظر را انتخاب کنید",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -314,7 +301,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_sessions[user_id]['selected_group'] = index
             user_sessions[user_id]['step'] = 'play_select_media'
             
-            # نمایش لیست فایل‌ها
             keyboard = []
             for i, mp3 in enumerate(mp3_files):
                 keyboard.append([InlineKeyboardButton(f"🎵 {mp3.get('name', f'MP3 {i+1}')}", callback_data=f'play_file_mp3_{i}')])
@@ -324,10 +310,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             group_name = joined_groups[index].get('name', 'گروه')
             await query.edit_message_text(
-                f"🎵 <b>انتخاب رسانه برای پخش در {group_name}</b>\n\n"
-                "📌 لطفاً یکی از رسانه‌های زیر رو انتخاب کنید:\n\n"
-                f"🎵 <b>تعداد MP3:</b> {len(mp3_files)}\n"
-                f"🎬 <b>تعداد MP4:</b> {len(mp4_files)}",
+                f"🎵 <b>انتخاب رسانه</b>\n\n"
+                f"🔹 لطفاً رسانه مورد نظر را برای پخش در {group_name} انتخاب کنید",
                 parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
@@ -350,8 +334,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == 'stop_playback':
         await query.edit_message_text(
-            "⏹️ <b>در حال توقف پخش...</b>\n\n"
-            "◄ لطفاً صبر کنید...",
+            "⏹️ <b>توقف پخش</b>\n\n"
+            "🔄 در حال توقف پخش در تمام گروه‌ها...",
             parse_mode='HTML'
         )
         await stop_all_playbacks(update, context)
@@ -370,7 +354,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    """شروع پخش در گروه انتخاب شده"""
     query = update.callback_query
     
     group_index = user_sessions[user_id]['selected_group']
@@ -390,9 +373,9 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     
     if not media_path or not os.path.exists(media_path):
         await query.edit_message_text(
-            f"❌ <b>فایل رسانه پیدا نشد!</b>\n\n"
-            f"◄ مسیر فایل: {media_path}\n"
-            "◄ لطفاً دوباره رسانه رو اضافه کنید.",
+            f"❌ <b>فایل رسانه یافت نشد</b>\n\n"
+            f"🔹 مسیر: {media_path}\n"
+            "🔹 لطفاً دوباره رسانه را اضافه کنید",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='play_voice')]])
         )
@@ -400,7 +383,8 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         return
     
     await query.edit_message_text(
-        f"🔄 <b>در حال پخش در ویس چت {group_name}</b>\n\n"
+        f"🔄 <b>در حال پخش</b>\n\n"
+        f"📁 <b>گروه:</b> {group_name}\n"
         f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
         f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n\n"
         "⏳ لطفاً صبر کنید...",
@@ -424,7 +408,6 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
             )
             await app.connect()
             
-            # جوین شدن در گروه
             try:
                 chat = await app.join_chat(group_link)
                 chat_id = chat.id
@@ -450,7 +433,6 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
                     await app.disconnect()
                     continue
             
-            # پخش در ویس چت
             try:
                 caller = TgCaller(app)
                 await caller.join_call(chat_id)
@@ -465,7 +447,7 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
             error_details.append(f"اکانت {acc.get('phone')}: {e}")
             fail_count += 1
     
-    result_text = f"✅ <b>عملیات پخش در ویس چت کامل شد!</b>\n\n"
+    result_text = f"✅ <b>عملیات پخش کامل شد</b>\n\n"
     result_text += f"📁 <b>گروه:</b> {group_name}\n"
     result_text += f"🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n"
     result_text += f"✅ <b>موفق:</b> {success_count} اکانت\n"
@@ -475,7 +457,7 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     if error_details:
         result_text += f"\n⚠️ <b>خطاها:</b>\n"
         for err in error_details[:3]:
-            result_text += f"◄ {err[:100]}...\n"
+            result_text += f"🔹 {err[:100]}...\n"
     
     await query.edit_message_text(
         result_text,
@@ -487,7 +469,6 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         del user_sessions[user_id]
 
 async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """متوقف کردن پخش در همه گروه‌ها"""
     try:
         from pyrogram import Client
         from tgcaller import TgCaller
@@ -512,14 +493,15 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 pass
         
         await update.message.reply_text(
-            f"✅ <b>پخش در {stopped_count} گروه متوقف شد!</b>\n\n"
-            "◄ تمام اکانت‌ها از ویس چت خارج شدند.",
+            f"✅ <b>پخش متوقف شد</b>\n\n"
+            f"🔹 پخش در {stopped_count} گروه متوقف شد",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
         )
     except Exception as e:
         await update.message.reply_text(
-            f"❌ خطا در توقف پخش: {str(e)}",
+            f"❌ <b>خطا در توقف پخش</b>\n\n🔹 {str(e)}",
+            parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
         )
 
@@ -533,11 +515,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     text = update.message.text.strip()
     
-    # ========== ساخت اکانت ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'phone':
         if not text.startswith('+') or not text[1:].isdigit():
             await update.message.reply_text(
-                "❌ فرمت شماره نامعتبر! مثال: +989123456789",
+                "❌ <b>فرمت شماره نامعتبر</b>\n\n🔹 مثال: +989123456789",
+                parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='add_account')]])
             )
             return
@@ -560,29 +542,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_sessions[user_id]['code_sent_time'] = time.time()
             
             await update.message.reply_text(
-                f"📨 <b>کد تایید ارسال شد!</b>\n\n"
-                f"◄ کد ۵ رقمی به شماره <code>{text}</code> ارسال شد.\n"
-                f"◄ لطفاً کد دریافتی را وارد کنید.\n"
-                f"⚠️ <b>توجه:</b> کد فقط ۵ دقیقه اعتبار داره!\n\n"
-                f"🔹 برای لغو: /cancel",
+                f"📨 <b>کد تایید ارسال شد</b>\n\n"
+                f"🔹 کد ۵ رقمی به شماره <code>{text}</code> ارسال شد\n"
+                f"🔹 لطفاً کد دریافتی را وارد کنید\n"
+                f"⚠️ <b>توجه:</b> کد تنها ۵ دقیقه اعتبار دارد",
                 parse_mode='HTML'
             )
         except Exception as e:
             error_msg = str(e)
             if "FLOOD_WAIT" in error_msg:
                 await update.message.reply_text(
-                    f"❌ <b>زیاد درخواست دادی!</b>\n\n"
-                    f"◄ خطا: <code>{error_msg}</code>\n"
-                    "◄ لطفاً چند دقیقه صبر کن و دوباره تلاش کن.",
+                    f"❌ <b>تعداد درخواست زیاد</b>\n\n"
+                    f"🔹 {error_msg}\n"
+                    "🔹 لطفاً چند دقیقه صبر کنید",
                     parse_mode='HTML',
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='add_account')]])
                 )
             else:
                 await update.message.reply_text(
-                    f"❌ <b>خطا در ارسال کد!</b>\n\n"
-                    f"◄ خطا: <code>{error_msg}</code>\n\n"
-                    "◄ لطفاً شماره و API را بررسی کن.\n"
-                    "🔹 برای شروع مجدد /start را بزن.",
+                    f"❌ <b>خطا در ارسال کد</b>\n\n"
+                    f"🔹 {error_msg}",
                     parse_mode='HTML',
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]])
                 )
@@ -592,16 +571,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'code':
         if not text.isdigit() or len(text) != 5:
-            await update.message.reply_text("❌ کد باید ۵ رقم باشد!")
+            await update.message.reply_text(
+                "❌ <b>کد نامعتبر</b>\n\n🔹 کد باید ۵ رقم باشد",
+                parse_mode='HTML'
+            )
             return
         
         code_sent_time = user_sessions[user_id].get('code_sent_time', 0)
         if time.time() - code_sent_time > 300:
             await update.message.reply_text(
-                "❌ <b>کد منقضی شده!</b>\n\n"
-                "◄ زمان ۵ دقیقه تمام شده.\n"
-                "◄ لطفاً دوباره از اول شروع کن.\n"
-                "🔹 /start را بزن و دوباره تلاش کن.",
+                "❌ <b>کد منقضی شده</b>\n\n"
+                "🔹 زمان ۵ دقیقه به پایان رسیده است\n"
+                "🔹 لطفاً دوباره از ابتدا شروع کنید",
                 parse_mode='HTML'
             )
             if user_id in user_sessions:
@@ -625,10 +606,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if "SESSION_PASSWORD_NEEDED" in error_msg:
                     user_sessions[user_id]['step'] = 'password'
                     await update.message.reply_text(
-                        "🔐 <b>مرحله ۴: وارد کردن پسورد دو مرحله‌ای</b>\n\n"
-                        "◄ این اکانت دارای <b>تایید دو مرحله‌ای</b> است.\n"
-                        "◄ لطفاً <b>پسورد</b> اکانت تلگرام خود را وارد کنید.\n\n"
-                        "🔹 برای لغو: /cancel",
+                        "🔐 <b>تایید دو مرحله‌ای</b>\n\n"
+                        "🔹 این اکانت دارای تایید دو مرحله‌ای است\n"
+                        "🔹 لطفاً پسورد اکانت خود را وارد کنید",
                         parse_mode='HTML'
                     )
                     return
@@ -646,7 +626,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_data()
             
             await update.message.reply_text(
-                f"✅ <b>سشن ساخته شد!</b>\n\n"
+                f"✅ <b>سشن ایجاد شد</b>\n\n"
                 f"📱 <b>شماره:</b> <code>{phone}</code>\n"
                 f"🆔 <b>شناسه:</b> {len(accounts)}\n\n"
                 f"📊 <b>تعداد کل اکانت‌ها:</b> {len(accounts)}",
@@ -662,24 +642,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             error_msg = str(e)
             if "PHONE_CODE_EXPIRED" in error_msg:
                 await update.message.reply_text(
-                    f"❌ <b>کد منقضی شده!</b>\n\n"
-                    "◄ کد وارد شده معتبر نیست.\n"
-                    "◄ لطفاً دوباره از اول شروع کن.\n"
-                    "🔹 /start را بزن و دوباره تلاش کن.",
+                    "❌ <b>کد منقضی شده</b>\n\n"
+                    "🔹 لطفاً دوباره از ابتدا شروع کنید",
                     parse_mode='HTML'
                 )
             elif "FLOOD_WAIT" in error_msg:
                 await update.message.reply_text(
-                    f"❌ <b>زیاد درخواست دادی!</b>\n\n"
-                    f"◄ خطا: <code>{error_msg}</code>\n"
-                    "◄ لطفاً چند دقیقه صبر کن و دوباره تلاش کن.",
+                    f"❌ <b>تعداد درخواست زیاد</b>\n\n🔹 {error_msg}",
                     parse_mode='HTML'
                 )
             else:
                 await update.message.reply_text(
-                    f"❌ <b>خطا در ساخت سشن!</b>\n\n"
-                    f"◄ خطا: <code>{error_msg}</code>\n"
-                    "🔹 /start را بزن و دوباره تلاش کن.",
+                    f"❌ <b>خطا در ایجاد سشن</b>\n\n🔹 {error_msg}",
                     parse_mode='HTML'
                 )
             if user_id in user_sessions:
@@ -691,7 +665,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 del user_sessions[user_id]
         return
     
-    # ========== مرحله ۴: دریافت پسورد دو مرحله‌ای ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'password':
         password = text
         
@@ -712,7 +685,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             save_data()
             
             await update.message.reply_text(
-                f"✅ <b>سشن ساخته شد!</b>\n\n"
+                f"✅ <b>سشن ایجاد شد</b>\n\n"
                 f"📱 <b>شماره:</b> <code>{phone}</code>\n"
                 f"🆔 <b>شناسه:</b> {len(accounts)}\n\n"
                 f"📊 <b>تعداد کل اکانت‌ها:</b> {len(accounts)}",
@@ -728,16 +701,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             error_msg = str(e)
             if "PASSWORD_HASH_INVALID" in error_msg:
                 await update.message.reply_text(
-                    "❌ <b>پسورد اشتباه است!</b>\n\n"
-                    "◄ لطفاً پسورد صحیح را وارد کنید.\n"
-                    "🔹 برای لغو: /cancel",
+                    "❌ <b>پسورد اشتباه است</b>\n\n"
+                    "🔹 لطفاً پسورد صحیح را وارد کنید",
                     parse_mode='HTML'
                 )
             else:
                 await update.message.reply_text(
-                    f"❌ <b>خطا در تایید پسورد!</b>\n\n"
-                    f"◄ خطا: <code>{error_msg}</code>\n"
-                    "🔹 /start را بزن و دوباره تلاش کن.",
+                    f"❌ <b>خطا در تایید پسورد</b>\n\n🔹 {error_msg}",
                     parse_mode='HTML'
                 )
                 if user_id in user_sessions:
@@ -749,7 +719,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     del user_sessions[user_id]
         return
     
-    # ========== افزودن MP3 ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'mp3':
         if update.message.audio:
             file = update.message.audio
@@ -767,7 +736,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mp3_files.append(file_info)
             save_data()
             await update.message.reply_text(
-                f"✅ <b>MP3 با موفقیت اضافه شد!</b>\n\n"
+                f"✅ <b>فایل MP3 اضافه شد</b>\n\n"
                 f"🎵 <b>نام:</b> {file_info['name']}\n"
                 f"⏱️ <b>مدت:</b> {file_info['duration']} ثانیه\n"
                 f"💾 <b>حجم:</b> {file_info['size']} بایت\n"
@@ -778,12 +747,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del user_sessions[user_id]
         else:
             await update.message.reply_text(
-                "❌ لطفاً یک فایل MP3 ارسال کنید!",
+                "❌ <b>فرمت فایل نامعتبر</b>\n\n🔹 لطفاً یک فایل MP3 ارسال کنید",
+                parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='add_mp3')]])
             )
         return
     
-    # ========== افزودن MP4 ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'mp4':
         if update.message.video:
             file = update.message.video
@@ -803,7 +772,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mp4_files.append(file_info)
             save_data()
             await update.message.reply_text(
-                f"✅ <b>MP4 با موفقیت اضافه شد!</b>\n\n"
+                f"✅ <b>فایل MP4 اضافه شد</b>\n\n"
                 f"🎬 <b>نام:</b> {file_info['name']}\n"
                 f"⏱️ <b>مدت:</b> {file_info['duration']} ثانیه\n"
                 f"💾 <b>حجم:</b> {file_info['size']} بایت\n"
@@ -814,19 +783,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del user_sessions[user_id]
         else:
             await update.message.reply_text(
-                "❌ لطفاً یک فایل MP4 ارسال کنید!",
+                "❌ <b>فرمت فایل نامعتبر</b>\n\n🔹 لطفاً یک فایل MP4 ارسال کنید",
+                parse_mode='HTML',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='add_mp4')]])
             )
         return
     
-    # ========== جوین شدن در گروه ==========
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'join_group_link':
         link = text
         
         await update.message.reply_text(
-            f"🔄 <b>در حال جوین شدن در گروه...</b>\n\n"
-            f"🔗 لینک: {link}\n"
-            f"📊 تعداد اکانت‌ها: {len(accounts)}\n\n"
+            f"🔄 <b>در حال جوین شدن</b>\n\n"
+            f"🔗 <b>لینک:</b> {link}\n"
+            f"📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n\n"
             "⏳ لطفاً صبر کنید...",
             parse_mode='HTML'
         )
@@ -880,9 +849,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 fail_count += 1
         
-        # ذخیره گروه
         if success_count > 0:
-            # بررسی تکراری نبودن
             exists = False
             for g in joined_groups:
                 if g.get('link') == link:
@@ -896,7 +863,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 })
                 save_data()
         
-        result_text = f"✅ <b>عملیات جوین شدن در گروه کامل شد!</b>\n\n"
+        result_text = f"✅ <b>عملیات جوین شدن کامل شد</b>\n\n"
         result_text += f"📁 <b>گروه:</b> {group_name}\n"
         result_text += f"🔗 <b>لینک:</b> {link}\n"
         result_text += f"✅ <b>موفق:</b> {success_count} اکانت\n"
@@ -922,18 +889,20 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
         del user_sessions[user_id]
         await update.message.reply_text(
-            "❌ عملیات لغو شد!",
+            "❌ <b>عملیات لغو شد</b>",
+            parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]])
         )
     else:
         await update.message.reply_text(
-            "ℹ️ هیچ عملیاتی وجود ندارد!",
+            "ℹ️ <b>هیچ عملیات فعالی وجود ندارد</b>",
+            parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]])
         )
 
 if __name__ == '__main__':
     try:
-        print("🔄 در حال پاک کردن Webhook...")
+        print("🔄 در حال راه‌اندازی...")
         try:
             response = httpx.post(
                 f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
