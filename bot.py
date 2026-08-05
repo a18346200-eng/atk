@@ -16,40 +16,44 @@ OWNER_ID = 7803165903
 API_ID = 29811798
 API_HASH = "ef5847a43a978d6883b97b0caeb81736"
 
-user_sessions = {}
-accounts = []
-mp3_files = []
-mp4_files = []
-joined_groups = []
-
+# ========== دیتابیس ==========
 DATA_FILE = "data.json"
 
 def load_data():
-    global accounts, mp3_files, mp4_files, joined_groups
+    default_data = {
+        'accounts': [],
+        'mp3_files': [],
+        'mp4_files': [],
+        'joined_groups': []
+    }
     try:
         if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, 'r') as f:
+            with open(DATA_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                accounts = data.get('accounts', [])
-                mp3_files = data.get('mp3_files', [])
-                mp4_files = data.get('mp4_files', [])
-                joined_groups = data.get('joined_groups', [])
-    except:
-        pass
+                for key in default_data:
+                    if key not in data:
+                        data[key] = default_data[key]
+                return data
+    except Exception as e:
+        print(f"⚠️ خطا در بارگذاری: {e}")
+    return default_data
 
-def save_data():
+def save_data(data):
     try:
-        with open(DATA_FILE, 'w') as f:
-            json.dump({
-                'accounts': accounts,
-                'mp3_files': mp3_files,
-                'mp4_files': mp4_files,
-                'joined_groups': joined_groups
-            }, f)
-    except:
-        pass
+        with open(DATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"❌ خطا در ذخیره: {e}")
+        return False
 
-load_data()
+data = load_data()
+accounts = data['accounts']
+mp3_files = data['mp3_files']
+mp4_files = data['mp4_files']
+joined_groups = data['joined_groups']
+
+user_sessions = {}
 
 OWNER_START_TEXT = """
 🌟 <b>به ربات ZX خوش آمدید</b>
@@ -71,7 +75,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
             [InlineKeyboardButton("💥 حمله", callback_data='attack')]
         ]
-        text = OWNER_START_TEXT + f"\n\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n📁 <b>تعداد گروه‌ها:</b> {len(joined_groups)}"
+        text = OWNER_START_TEXT + f"\n\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n📁 <b>تعداد گروه‌ها:</b> {len(joined_groups)}\n🎵 <b>تعداد MP3:</b> {len(mp3_files)}"
         
         await update.message.reply_text(
             text,
@@ -330,7 +334,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
             [InlineKeyboardButton("💥 حمله", callback_data='attack')]
         ]
-        text = OWNER_START_TEXT + f"\n\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n📁 <b>تعداد گروه‌ها:</b> {len(joined_groups)}"
+        text = OWNER_START_TEXT + f"\n\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n📁 <b>تعداد گروه‌ها:</b> {len(joined_groups)}\n🎵 <b>تعداد MP3:</b> {len(mp3_files)}"
         await query.edit_message_text(
             text,
             parse_mode='HTML',
@@ -338,6 +342,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
+    """پخش در ویسچت با py-tgcalls"""
     query = update.callback_query
     
     group_index = user_sessions[user_id]['selected_group']
@@ -365,7 +370,7 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         return
     
     await query.edit_message_text(
-        f"🔄 <b>در حال پخش</b>\n\n📁 <b>گروه:</b> {group_name}\n🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n\n⏳ لطفاً صبر کنید...",
+        f"🔄 <b>در حال پخش در ویسچت</b>\n\n📁 <b>گروه:</b> {group_name}\n🎵 <b>رسانه:</b> {media_file.get('name', 'Unknown')}\n📊 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n\n⏳ لطفاً صبر کنید...",
         parse_mode='HTML'
     )
     
@@ -376,7 +381,9 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     for acc in accounts:
         try:
             from pyrogram import Client
-            from tgcaller import TgCaller
+            from py_tgcalls import PyTgCalls
+            from py_tgcalls.types import AudioQuality
+            from py_tgcalls.types.input_stream import AudioStream, InputAudioStream
             
             app = Client(
                 f"play_session_{acc['id']}",
@@ -386,35 +393,49 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
             )
             await app.connect()
             
-            # 🔥 دیگر جوین نمیشیم، مستقیم وارد ویس چت میشیم
             try:
-                # ابتدا چت رو میگیریم
-                if group_link.startswith('https://t.me/joinchat/') or group_link.startswith('https://t.me/+'):
-                    # لینک دعوت
-                    if 'joinchat/' in group_link:
-                        invite_code = group_link.split('joinchat/')[-1]
-                    elif '+' in group_link:
-                        invite_code = group_link.split('+')[-1]
-                    else:
-                        invite_code = group_link.replace('https://t.me/', '').replace('@', '')
-                    
-                    if invite_code and not invite_code.startswith('+'):
-                        chat = await app.get_chat(invite_code)
-                        chat_id = chat.id
-                    else:
-                        chat = await app.get_chat(group_link)
-                        chat_id = chat.id
-                else:
-                    # لینک معمولی با یوزرنیم
-                    username = group_link.replace('https://t.me/', '').replace('@', '')
-                    chat = await app.get_chat(username)
+                # جوین شدن در گروه
+                try:
+                    chat = await app.join_chat(group_link)
                     chat_id = chat.id
+                except:
+                    try:
+                        if 'joinchat/' in group_link:
+                            invite_code = group_link.split('joinchat/')[-1]
+                        elif '+' in group_link:
+                            invite_code = group_link.split('+')[-1]
+                        else:
+                            invite_code = group_link.replace('https://t.me/', '').replace('@', '')
+                        
+                        if invite_code and not invite_code.startswith('+'):
+                            chat = await app.join_chat(invite_code)
+                            chat_id = chat.id
+                        else:
+                            chat = await app.get_chat(group_link)
+                            chat_id = chat.id
+                            await app.join_chat(chat_id)
+                    except Exception as e2:
+                        error_details.append(f"اکانت {acc.get('phone')}: جوین نشد - {e2}")
+                        fail_count += 1
+                        await app.disconnect()
+                        continue
                 
-                # مستقیم وارد ویس چت میشیم
-                caller = TgCaller(app)
-                await caller.join_call(chat_id)
-                await caller.play(media_path)
+                # پخش در ویسچت
+                call = PyTgCalls(app)
+                await call.start()
+                
+                await call.join_group_call(
+                    chat_id,
+                    AudioStream(
+                        InputAudioStream(
+                            media_path,
+                            audio_parameters=AudioQuality.HIGH
+                        )
+                    )
+                )
+                
                 success_count += 1
+                await app.disconnect()
                 
             except Exception as e:
                 error_details.append(f"اکانت {acc.get('phone')}: خطا در پخش - {e}")
@@ -447,9 +468,10 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         del user_sessions[user_id]
 
 async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """متوقف کردن پخش"""
     try:
         from pyrogram import Client
-        from tgcaller import TgCaller
+        from py_tgcalls import PyTgCalls
         
         stopped_count = 0
         for acc in accounts:
@@ -462,16 +484,24 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
                 await app.connect()
                 
-                caller = TgCaller(app)
-                await caller.leave_all_calls()
-                stopped_count += 1
+                call = PyTgCalls(app)
+                await call.start()
                 
+                async for dialog in app.get_dialogs():
+                    if dialog.chat.type in ["group", "supergroup"]:
+                        try:
+                            await call.leave_group_call(dialog.chat.id)
+                            stopped_count += 1
+                        except:
+                            pass
+                
+                await call.stop()
                 await app.disconnect()
             except:
                 pass
         
         await update.message.reply_text(
-            f"✅ <b>پخش متوقف شد</b>\n\n🔹 پخش در {stopped_count} گروه متوقف شد",
+            f"✅ <b>پخش متوقف شد</b>\n\n🔹 {stopped_count} گروه",
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]])
         )
@@ -506,7 +536,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'path': file_path
             }
             mp3_files.append(file_info)
-            save_data()
+            data['mp3_files'] = mp3_files
+            save_data(data)
             
             await update.message.reply_text(
                 f"✅ <b>فایل MP3 اضافه شد</b>\n\n"
@@ -544,7 +575,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'path': file_path
             }
             mp4_files.append(file_info)
-            save_data()
+            data['mp4_files'] = mp4_files
+            save_data(data)
             
             await update.message.reply_text(
                 f"✅ <b>فایل MP4 اضافه شد</b>\n\n"
@@ -681,7 +713,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'id': len(accounts) + 1
             }
             accounts.append(account_info)
-            save_data()
+            data['accounts'] = accounts
+            save_data(data)
             
             await update.message.reply_text(
                 f"✅ <b>سشن ایجاد شد</b>\n\n"
@@ -742,7 +775,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'id': len(accounts) + 1
             }
             accounts.append(account_info)
-            save_data()
+            data['accounts'] = accounts
+            save_data(data)
             
             await update.message.reply_text(
                 f"✅ <b>سشن ایجاد شد</b>\n\n"
@@ -854,7 +888,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     'link': link,
                     'joined_at': time.time()
                 })
-                save_data()
+                data['joined_groups'] = joined_groups
+                save_data(data)
         
         result_text = f"✅ <b>عملیات جوین شدن کامل شد</b>\n\n"
         result_text += f"📁 <b>گروه:</b> {group_name}\n"
@@ -896,6 +931,11 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == '__main__':
     try:
         print("🔄 در حال راه‌اندازی...")
+        print(f"📊 تعداد اکانت‌ها: {len(accounts)}")
+        print(f"🎵 تعداد MP3: {len(mp3_files)}")
+        print(f"🎬 تعداد MP4: {len(mp4_files)}")
+        print(f"📁 تعداد گروه‌ها: {len(joined_groups)}")
+        
         try:
             response = httpx.post(
                 f"https://api.telegram.org/bot{TOKEN}/deleteWebhook",
@@ -910,11 +950,6 @@ if __name__ == '__main__':
         time.sleep(2)
         
         print("🚀 ربات در حال راه‌اندازی...")
-        print(f"🔑 API_ID: {API_ID}")
-        print(f"📊 تعداد اکانت‌ها: {len(accounts)}")
-        print(f"🎵 تعداد MP3: {len(mp3_files)}")
-        print(f"🎬 تعداد MP4: {len(mp4_files)}")
-        print(f"📁 تعداد گروه‌ها: {len(joined_groups)}")
         
         application = Application.builder().token(TOKEN).build()
         
