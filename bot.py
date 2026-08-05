@@ -736,3 +736,6 @@ if __name__ == '__main__':
             drop_pending_updates=True,
             allowed_updates=['message', 'callback_query']
         )
+        
+    except Exception as e:
+        print(f"❌ خطا: {e}")
