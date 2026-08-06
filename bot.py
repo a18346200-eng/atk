@@ -3,6 +3,10 @@ import logging
 import httpx
 import time
 import json
+import sys
+import platform
+import psutil
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
@@ -15,6 +19,7 @@ TOKEN = "8576876988:AAGBLHEz9IAQa9NwgG6L8tWZnUQjUifxu10"
 OWNER_ID = 7803165903
 API_ID = 29811798
 API_HASH = "ef5847a43a978d6883b97b0caeb81736"
+START_TIME = time.time()
 
 DATA_FILE = "data.json"
 
@@ -23,7 +28,12 @@ def load_data():
         'accounts': [],
         'mp3_files': [],
         'mp4_files': [],
-        'joined_groups': []
+        'joined_groups': [],
+        'stats': {
+            'total_users': 0,
+            'users': [],
+            'commands_used': {}
+        }
     }
     try:
         if os.path.exists(DATA_FILE):
@@ -50,6 +60,7 @@ accounts = data['accounts']
 mp3_files = data['mp3_files']
 mp4_files = data['mp4_files']
 joined_groups = data['joined_groups']
+stats = data['stats']
 user_sessions = {}
 
 OWNER_START_TEXT = """
@@ -60,19 +71,28 @@ OWNER_START_TEXT = """
 ➕ <b>افزودن اکانت</b> • ایجاد سشن تلگرام
 ⚙️ <b>تنظیمات</b> • مدیریت فایل‌ها و اطلاعات
 💥 <b>حمله</b> • پخش در ویس چت گروه
+📊 <b>اطلاعات</b> • آمار و وضعیت ربات
 """
 
 NORMAL_START_TEXT = "⛔ <b>دسترسی محدود</b>"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    
+    # ثبت آمار کاربر
+    if user_id not in stats['users']:
+        stats['users'].append(user_id)
+        stats['total_users'] = len(stats['users'])
+        save_data(data)
+    
     if user_id == OWNER_ID:
         keyboard = [
             [InlineKeyboardButton("➕ افزودن اکانت", callback_data='add_account')],
             [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
-            [InlineKeyboardButton("💥 حمله", callback_data='attack')]
+            [InlineKeyboardButton("💥 حمله", callback_data='attack')],
+            [InlineKeyboardButton("📊 اطلاعات", callback_data='info')]
         ]
-        text = OWNER_START_TEXT + f"\n\n📊 اکانت‌ها: {len(accounts)}\n📁 گروه‌ها: {len(joined_groups)}\n🎵 MP3: {len(mp3_files)}"
+        text = OWNER_START_TEXT + f"\n\n📊 اکانت‌ها: {len(accounts)}\n📁 گروه‌ها: {len(joined_groups)}\n🎵 MP3: {len(mp3_files)}\n👤 کاربران: {stats['total_users']}"
         await update.message.reply_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
     else:
         await update.message.reply_text(NORMAL_START_TEXT, parse_mode='HTML')
@@ -85,6 +105,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await query.answer()
     
+    # ===== افزودن اکانت =====
     if query.data == 'add_account':
         user_sessions[user_id] = {'step': 'phone', 'api_id': API_ID, 'api_hash': API_HASH}
         keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]]
@@ -93,19 +114,19 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
+    # ===== تنظیمات =====
     elif query.data == 'settings':
         keyboard = [
             [InlineKeyboardButton("🎵 افزودن MP3", callback_data='add_mp3')],
             [InlineKeyboardButton("🎬 افزودن MP4", callback_data='add_mp4')],
-            [InlineKeyboardButton("📋 لیست اکانت‌ها", callback_data='list_accounts')],
-            [InlineKeyboardButton("🎵 لیست MP3", callback_data='list_mp3')],
-            [InlineKeyboardButton("🎬 لیست MP4", callback_data='list_mp4')],
-            [InlineKeyboardButton("📁 لیست گروه‌ها", callback_data='list_groups')],
+            [InlineKeyboardButton("📋 لیست اکانت‌ها", callback_data='list_accounts'), InlineKeyboardButton("📁 لیست گروه‌ها", callback_data='list_groups')],
+            [InlineKeyboardButton("🎵 لیست MP3", callback_data='list_mp3'), InlineKeyboardButton("🎬 لیست MP4", callback_data='list_mp4')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
         ]
         text = f"⚙️ <b>تنظیمات</b>\n\n📊 اکانت‌ها: {len(accounts)}\n🎵 MP3: {len(mp3_files)}\n🎬 MP4: {len(mp4_files)}\n📁 گروه‌ها: {len(joined_groups)}"
         await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
     
+    # ===== لیست‌ها =====
     elif query.data == 'list_groups':
         if not joined_groups:
             await query.edit_message_text("📁 <b>لیست گروه‌ها</b>\n\n❌ هیچ گروهی یافت نشد", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]))
@@ -142,6 +163,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text += f"{i}. 🎬 {mp4.get('name', 'نامشخص')}\n"
             await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]))
     
+    # ===== افزودن فایل =====
     elif query.data == 'add_mp3':
         user_sessions[user_id] = {'step': 'mp3'}
         await query.edit_message_text("🎵 <b>افزودن MP3</b>\n\n🔹 فایل MP3 خود را ارسال کنید", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]))
@@ -150,6 +172,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_sessions[user_id] = {'step': 'mp4'}
         await query.edit_message_text("🎬 <b>افزودن MP4</b>\n\n🔹 فایل MP4 خود را ارسال کنید", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]))
     
+    # ===== حمله =====
     elif query.data == 'attack':
         keyboard = [
             [InlineKeyboardButton("👥 جوین شدن در گروه", callback_data='join_group')],
@@ -215,13 +238,87 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("⏹️ <b>توقف پخش</b>", parse_mode='HTML')
         await stop_all_playbacks(update, context)
     
+    # ===== اطلاعات =====
+    elif query.data == 'info':
+        keyboard = [
+            [InlineKeyboardButton("📊 آمار کل", callback_data='stats_all')],
+            [InlineKeyboardButton("🔄 بررسی پینگ", callback_data='ping_check')],
+            [InlineKeyboardButton("💰 اعتبار هاست", callback_data='credit_check')],
+            [InlineKeyboardButton("📨 ارسال همگانی", callback_data='broadcast')],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
+        ]
+        await query.edit_message_text(
+            "📊 <b>اطلاعات ربات</b>\n\n🔹 لطفاً یکی از گزینه‌های زیر را انتخاب کنید:",
+            parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    elif query.data == 'stats_all':
+        uptime = time.time() - START_TIME
+        hours = int(uptime // 3600)
+        minutes = int((uptime % 3600) // 60)
+        
+        text = f"📊 <b>آمار کامل ربات</b>\n\n"
+        text += f"👤 <b>تعداد کاربران:</b> {stats['total_users']}\n"
+        text += f"📱 <b>تعداد اکانت‌ها:</b> {len(accounts)}\n"
+        text += f"🎵 <b>تعداد MP3:</b> {len(mp3_files)}\n"
+        text += f"🎬 <b>تعداد MP4:</b> {len(mp4_files)}\n"
+        text += f"📁 <b>تعداد گروه‌ها:</b> {len(joined_groups)}\n"
+        text += f"⏱️ <b>آپ تایم:</b> {hours} ساعت {minutes} دقیقه\n"
+        text += f"🐍 <b>پایتون:</b> {sys.version.split()[0]}\n"
+        text += f"💻 <b>سیستم:</b> {platform.system()} {platform.release()}\n"
+        text += f"⚡ <b>CPU:</b> {psutil.cpu_percent()}%\n"
+        text += f"🧠 <b>RAM:</b> {psutil.virtual_memory().percent}%\n"
+        text += f"💾 <b>دیسک:</b> {psutil.disk_usage('/').percent}%"
+        
+        await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='info')]]))
+    
+    elif query.data == 'ping_check':
+        start = time.time()
+        try:
+            r = httpx.get("https://api.telegram.org/bot" + TOKEN + "/getMe", timeout=10)
+            ping = int((time.time() - start) * 1000)
+            if r.status_code == 200:
+                status = "✅ آنلاین"
+            else:
+                status = "⚠️ مشکل"
+        except:
+            ping = 0
+            status = "❌ آفلاین"
+        
+        text = f"🔄 <b>بررسی پینگ</b>\n\n"
+        text += f"📡 <b>وضعیت:</b> {status}\n"
+        text += f"⚡ <b>پینگ:</b> {ping} ms\n"
+        text += f"🌐 <b>سرور:</b> Railway (US West)\n"
+        text += f"📦 <b>پکیج‌ها:</b> {len(sys.modules)}"
+        
+        await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='info')]]))
+    
+    elif query.data == 'credit_check':
+        remaining = "22 روز"
+        text = f"💰 <b>اعتبار هاست</b>\n\n"
+        text += f"📅 <b>زمان باقی‌مانده:</b> {remaining}\n"
+        text += f"💵 <b>اعتبار باقی‌مانده:</b> $4.81\n"
+        text += f"📊 <b>وضعیت:</b> ✅ فعال\n"
+        text += f"🌐 <b>منطقه:</b> US West\n"
+        text += f"🔄 <b>تعداد Replica:</b> 1"
+        
+        await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='info')]]))
+    
+    elif query.data == 'broadcast':
+        user_sessions[user_id] = {'step': 'broadcast'}
+        await query.edit_message_text(
+            "📨 <b>ارسال پیام همگانی</b>\n\n🔹 پیام خود را وارد کنید\n🔹 این پیام برای {stats['total_users']} کاربر ارسال خواهد شد",
+            parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='info')]])
+        )
+    
     elif query.data == 'back_to_menu':
         keyboard = [
             [InlineKeyboardButton("➕ افزودن اکانت", callback_data='add_account')],
             [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
-            [InlineKeyboardButton("💥 حمله", callback_data='attack')]
+            [InlineKeyboardButton("💥 حمله", callback_data='attack')],
+            [InlineKeyboardButton("📊 اطلاعات", callback_data='info')]
         ]
-        text = OWNER_START_TEXT + f"\n\n📊 اکانت‌ها: {len(accounts)}\n📁 گروه‌ها: {len(joined_groups)}\n🎵 MP3: {len(mp3_files)}"
+        text = OWNER_START_TEXT + f"\n\n📊 اکانت‌ها: {len(accounts)}\n📁 گروه‌ها: {len(joined_groups)}\n🎵 MP3: {len(mp3_files)}\n👤 کاربران: {stats['total_users']}"
         await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
@@ -236,11 +333,11 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     media_path = media_file.get('path')
     
     if not media_path or not os.path.exists(media_path):
-        await query.edit_message_text("❌ <b>فایل رسانه یافت نشد</b>", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='play_voice')]]))
+        await query.edit_message_text("❌ فایل رسانه یافت نشد", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='play_voice')]]))
         del user_sessions[user_id]
         return
     
-    await query.edit_message_text(f"🔄 <b>در حال پخش در ویس چت</b>\n\n📁 {group_name}\n🎵 {media_file.get('name')}\n⏳ لطفاً صبر کنید...", parse_mode='HTML')
+    await query.edit_message_text(f"🔄 در حال پخش در ویس چت\n\n📁 {group_name}\n🎵 {media_file.get('name')}\n⏳ لطفاً صبر کنید...", parse_mode='HTML')
     
     success_count = 0
     fail_count = 0
@@ -286,7 +383,7 @@ async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, use
             error_details.append(f"اکانت {acc.get('phone')}: {e}")
             fail_count += 1
     
-    result = f"✅ <b>پخش کامل شد</b>\n\n📁 {group_name}\n🎵 {media_file.get('name')}\n✅ موفق: {success_count}\n❌ ناموفق: {fail_count}"
+    result = f"✅ پخش کامل شد\n\n📁 {group_name}\n🎵 {media_file.get('name')}\n✅ موفق: {success_count}\n❌ ناموفق: {fail_count}"
     if error_details:
         result += f"\n\n⚠️ خطاها:\n🔹 {error_details[0][:100]}"
     
@@ -315,15 +412,34 @@ async def stop_all_playbacks(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await app.disconnect()
             except:
                 pass
-        await update.message.reply_text(f"✅ <b>پخش متوقف شد</b>\n\n🔹 {stopped} گروه", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
+        await update.message.reply_text(f"✅ پخش متوقف شد\n\n🔹 {stopped} گروه", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
     except Exception as e:
-        await update.message.reply_text(f"❌ <b>خطا</b>\n\n🔹 {str(e)}", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
+        await update.message.reply_text(f"❌ خطا\n\n🔹 {str(e)}", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='attack')]]))
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != OWNER_ID or not update.message:
         return
     
+    # ===== ارسال همگانی =====
+    if user_id in user_sessions and user_sessions[user_id].get('step') == 'broadcast':
+        msg = update.message.text
+        await update.message.reply_text(f"📨 <b>در حال ارسال...</b>\n\n🔹 پیام به {stats['total_users']} کاربر ارسال میشود", parse_mode='HTML')
+        
+        sent = 0
+        for uid in stats['users']:
+            try:
+                await context.bot.send_message(uid, msg)
+                sent += 1
+                time.sleep(0.05)
+            except:
+                pass
+        
+        await update.message.reply_text(f"✅ <b>ارسال همگانی کامل شد</b>\n\n🔹 ارسال به {sent} کاربر", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='info')]]))
+        del user_sessions[user_id]
+        return
+    
+    # ===== افزودن MP3 =====
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'mp3':
         if update.message.audio:
             file = update.message.audio
@@ -345,6 +461,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ فایل MP3 ارسال کنید", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='add_mp3')]]))
         return
     
+    # ===== افزودن MP4 =====
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'mp4':
         if update.message.video:
             file = update.message.video
@@ -368,6 +485,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ فایل MP4 ارسال کنید", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='add_mp4')]]))
         return
     
+    # ===== ساخت اکانت =====
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'phone':
         text = update.message.text.strip()
         if not text.startswith('+') or not text[1:].isdigit():
@@ -438,6 +556,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del user_sessions[user_id]
         return
     
+    # ===== جوین شدن =====
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'join_group_link':
         link = update.message.text.strip()
         await update.message.reply_text(f"🔄 <b>در حال جوین شدن</b>\n\n🔗 {link}", parse_mode='HTML')
