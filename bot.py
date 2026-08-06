@@ -79,7 +79,6 @@ NORMAL_START_TEXT = "⛔ <b>دسترسی محدود</b>"
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # ثبت آمار کاربر
     if user_id not in stats['users']:
         stats['users'].append(user_id)
         stats['total_users'] = len(stats['users'])
@@ -105,7 +104,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await query.answer()
     
-    # ===== افزودن اکانت =====
     if query.data == 'add_account':
         user_sessions[user_id] = {'step': 'phone', 'api_id': API_ID, 'api_hash': API_HASH}
         keyboard = [[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]]
@@ -114,7 +112,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    # ===== تنظیمات =====
     elif query.data == 'settings':
         keyboard = [
             [InlineKeyboardButton("🎵 افزودن MP3", callback_data='add_mp3')],
@@ -126,7 +123,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = f"⚙️ <b>تنظیمات</b>\n\n📊 اکانت‌ها: {len(accounts)}\n🎵 MP3: {len(mp3_files)}\n🎬 MP4: {len(mp4_files)}\n📁 گروه‌ها: {len(joined_groups)}"
         await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
     
-    # ===== لیست‌ها =====
     elif query.data == 'list_groups':
         if not joined_groups:
             await query.edit_message_text("📁 <b>لیست گروه‌ها</b>\n\n❌ هیچ گروهی یافت نشد", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]))
@@ -163,7 +159,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text += f"{i}. 🎬 {mp4.get('name', 'نامشخص')}\n"
             await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]))
     
-    # ===== افزودن فایل =====
     elif query.data == 'add_mp3':
         user_sessions[user_id] = {'step': 'mp3'}
         await query.edit_message_text("🎵 <b>افزودن MP3</b>\n\n🔹 فایل MP3 خود را ارسال کنید", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]))
@@ -172,7 +167,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_sessions[user_id] = {'step': 'mp4'}
         await query.edit_message_text("🎬 <b>افزودن MP4</b>\n\n🔹 فایل MP4 خود را ارسال کنید", parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='settings')]]))
     
-    # ===== حمله =====
     elif query.data == 'attack':
         keyboard = [
             [InlineKeyboardButton("👥 جوین شدن در گروه", callback_data='join_group')],
@@ -238,7 +232,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("⏹️ <b>توقف پخش</b>", parse_mode='HTML')
         await stop_all_playbacks(update, context)
     
-    # ===== اطلاعات =====
     elif query.data == 'info':
         keyboard = [
             [InlineKeyboardButton("📊 آمار کل", callback_data='stats_all')],
@@ -294,10 +287,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='info')]]))
     
     elif query.data == 'credit_check':
-        remaining = "22 روز"
+        remaining = "21 روز"
         text = f"💰 <b>اعتبار هاست</b>\n\n"
         text += f"📅 <b>زمان باقی‌مانده:</b> {remaining}\n"
-        text += f"💵 <b>اعتبار باقی‌مانده:</b> $4.81\n"
+        text += f"💵 <b>اعتبار باقی‌مانده:</b> $4.80\n"
         text += f"📊 <b>وضعیت:</b> ✅ فعال\n"
         text += f"🌐 <b>منطقه:</b> US West\n"
         text += f"🔄 <b>تعداد Replica:</b> 1"
@@ -307,7 +300,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'broadcast':
         user_sessions[user_id] = {'step': 'broadcast'}
         await query.edit_message_text(
-            "📨 <b>ارسال پیام همگانی</b>\n\n🔹 پیام خود را وارد کنید\n🔹 این پیام برای {stats['total_users']} کاربر ارسال خواهد شد",
+            f"📨 <b>ارسال پیام همگانی</b>\n\n🔹 پیام خود را وارد کنید\n🔹 این پیام برای {stats['total_users']} کاربر ارسال خواهد شد",
             parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='info')]])
         )
     
@@ -421,7 +414,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id != OWNER_ID or not update.message:
         return
     
-    # ===== ارسال همگانی =====
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'broadcast':
         msg = update.message.text
         await update.message.reply_text(f"📨 <b>در حال ارسال...</b>\n\n🔹 پیام به {stats['total_users']} کاربر ارسال میشود", parse_mode='HTML')
@@ -439,7 +431,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del user_sessions[user_id]
         return
     
-    # ===== افزودن MP3 =====
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'mp3':
         if update.message.audio:
             file = update.message.audio
@@ -461,7 +452,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ فایل MP3 ارسال کنید", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='add_mp3')]]))
         return
     
-    # ===== افزودن MP4 =====
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'mp4':
         if update.message.video:
             file = update.message.video
@@ -485,7 +475,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ فایل MP4 ارسال کنید", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='add_mp4')]]))
         return
     
-    # ===== ساخت اکانت =====
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'phone':
         text = update.message.text.strip()
         if not text.startswith('+') or not text[1:].isdigit():
@@ -556,7 +545,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del user_sessions[user_id]
         return
     
-    # ===== جوین شدن =====
     if user_id in user_sessions and user_sessions[user_id].get('step') == 'join_group_link':
         link = update.message.text.strip()
         await update.message.reply_text(f"🔄 <b>در حال جوین شدن</b>\n\n🔗 {link}", parse_mode='HTML')
