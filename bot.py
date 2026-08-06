@@ -91,7 +91,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💥 حمله", callback_data='attack')],
             [InlineKeyboardButton("📊 اطلاعات", callback_data='info')]
         ]
-        text = OWNER_START_TEXT + f"\n\n📊 اکانت‌ها: {len(accounts)}\n📁 گروه‌ها: {len(joined_groups)}\n🎵 MP3: {len(mp3_files)}\n👤 کاربران: {stats['total_users']}"
+        text = OWNER_START_TEXT
         await update.message.reply_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
     else:
         await update.message.reply_text(NORMAL_START_TEXT, parse_mode='HTML')
@@ -311,7 +311,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💥 حمله", callback_data='attack')],
             [InlineKeyboardButton("📊 اطلاعات", callback_data='info')]
         ]
-        text = OWNER_START_TEXT + f"\n\n📊 اکانت‌ها: {len(accounts)}\n📁 گروه‌ها: {len(joined_groups)}\n🎵 MP3: {len(mp3_files)}\n👤 کاربران: {stats['total_users']}"
+        text = OWNER_START_TEXT
         await query.edit_message_text(text, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def start_playback(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
