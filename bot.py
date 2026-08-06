@@ -67,11 +67,6 @@ OWNER_START_TEXT = """
 🌟 <b>به ربات ZX خوش آمدید</b>
 
 💎 <b>سازنده محترم</b>، لطفاً یکی از گزینه‌های زیر را انتخاب کنید:
-
-➕ <b>افزودن اکانت</b> • ایجاد سشن تلگرام
-⚙️ <b>تنظیمات</b> • مدیریت فایل‌ها و اطلاعات
-💥 <b>حمله</b> • پخش در ویس چت گروه
-📊 <b>اطلاعات</b> • آمار و وضعیت ربات
 """
 
 NORMAL_START_TEXT = "⛔ <b>دسترسی محدود</b>"
@@ -87,8 +82,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id == OWNER_ID:
         keyboard = [
             [InlineKeyboardButton("➕ افزودن اکانت", callback_data='add_account')],
-            [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
-            [InlineKeyboardButton("💥 حمله", callback_data='attack')],
+            [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings'), InlineKeyboardButton("💥 حمله", callback_data='attack')],
             [InlineKeyboardButton("📊 اطلاعات", callback_data='info')]
         ]
         text = OWNER_START_TEXT
@@ -235,8 +229,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'info':
         keyboard = [
             [InlineKeyboardButton("📊 آمار کل", callback_data='stats_all')],
-            [InlineKeyboardButton("🔄 بررسی پینگ", callback_data='ping_check')],
-            [InlineKeyboardButton("💰 اعتبار هاست", callback_data='credit_check')],
+            [InlineKeyboardButton("🔄 بررسی پینگ", callback_data='ping_check'), InlineKeyboardButton("💰 اعتبار هاست", callback_data='credit_check')],
             [InlineKeyboardButton("📨 ارسال همگانی", callback_data='broadcast')],
             [InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_menu')]
         ]
@@ -307,8 +300,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'back_to_menu':
         keyboard = [
             [InlineKeyboardButton("➕ افزودن اکانت", callback_data='add_account')],
-            [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings')],
-            [InlineKeyboardButton("💥 حمله", callback_data='attack')],
+            [InlineKeyboardButton("⚙️ تنظیمات", callback_data='settings'), InlineKeyboardButton("💥 حمله", callback_data='attack')],
             [InlineKeyboardButton("📊 اطلاعات", callback_data='info')]
         ]
         text = OWNER_START_TEXT
